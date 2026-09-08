@@ -68,6 +68,7 @@ function handleAudioEnded() {
   if (playCount >= 5) {
     playCount = 0
     index.value = (index.value + 1) % words.length
+    revealed.value = false
   }
   playCurrent()
 }
@@ -135,9 +136,7 @@ function handleTouchEnd(event) {
 function onKeydown(event) {
   if (event.target.closest('input, textarea')) return
   if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
-    if (event.repeat) return
     event.preventDefault()
-    revealed.value = !revealed.value
     return
   }
   if (event.target.closest('button, select')) return
@@ -146,17 +145,26 @@ function onKeydown(event) {
   moveWord(event.key === 'ArrowRight' ? 1 : -1)
 }
 
+function onKeyup(event) {
+  if (event.target.closest('input, textarea')) return
+  if (event.key !== '0' && event.code !== 'Digit0' && event.code !== 'Numpad0') return
+  event.preventDefault()
+  revealed.value = !revealed.value
+}
+
 onMounted(() => {
   audio = new Audio()
   audio.preload = 'auto'
   audio.addEventListener('error', () => { playing.value = false })
   audio.addEventListener('ended', handleAudioEnded)
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('keyup', onKeyup)
   playCurrent()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keyup', onKeyup)
   stopAudio()
   if (audio) {
     audio.removeAttribute('src')
