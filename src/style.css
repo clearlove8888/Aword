@@ -122,11 +122,11 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   scrollbar-width: thin;
 }
 
-.meaning { margin: 0 0 18px; font-size: var(--meaning-size, 34px); line-height: 1.45; overflow-wrap: anywhere; }
+.meaning { margin: 0 0 18px; font-size: var(--meaning-size, 38px); line-height: 1.45; overflow-wrap: anywhere; }
 .examples { display: grid; gap: 16px; }
 .example { overflow-wrap: anywhere; }
-.example p { margin: 8px 0; font-size: var(--example-size, 22px); line-height: 1.5; }
-.example p + p { color: #7f9caf; font-size: var(--translation-size, 18px); }
+.example p { margin: 8px 0; font-size: var(--example-size, 24px); line-height: 1.5; }
+.example p + p { color: #7f9caf; font-size: var(--translation-size, 20px); }
 
 .reveal-button {
   position: absolute;

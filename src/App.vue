@@ -16,9 +16,9 @@ const jumpMessage = ref('')
 const current = computed(() => words[index.value])
 const displayStyle = computed(() => ({
   '--word-size': `${Math.min(18, 145 / Math.max(current.value.word.length, 1)) * textScale.value}vw`,
-  '--meaning-size': `${34 * textScale.value}px`,
-  '--example-size': `${22 * textScale.value}px`,
-  '--translation-size': `${18 * textScale.value}px`,
+  '--meaning-size': `${38 * textScale.value}px`,
+  '--example-size': `${24 * textScale.value}px`,
+  '--translation-size': `${20 * textScale.value}px`,
 }))
 let audio
 let requestId = 0
@@ -51,8 +51,28 @@ async function playCurrent() {
 }
 
 function toggleAudio() {
-  if (playing.value) stopAudio()
-  else playCurrent()
+  togglePause()
+}
+
+async function togglePause() {
+  if (!audio) return
+  if (!audio.paused) {
+    requestId++
+    audio.pause()
+    playing.value = false
+    return
+  }
+  if (!audio.src) {
+    playCurrent()
+    return
+  }
+  const request = ++requestId
+  try {
+    await audio.play()
+    if (request === requestId) playing.value = true
+  } catch {
+    playing.value = false
+  }
 }
 
 function updatePlaybackRate() {
@@ -135,7 +155,7 @@ function handleTouchEnd(event) {
 
 function onKeydown(event) {
   if (event.target.closest('input, textarea')) return
-  if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
+  if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0' || event.code === 'Space' || event.key === ' ') {
     event.preventDefault()
     return
   }
@@ -147,9 +167,16 @@ function onKeydown(event) {
 
 function onKeyup(event) {
   if (event.target.closest('input, textarea')) return
-  if (event.key !== '0' && event.code !== 'Digit0' && event.code !== 'Numpad0') return
-  event.preventDefault()
-  revealed.value = !revealed.value
+  if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
+    event.preventDefault()
+    revealed.value = !revealed.value
+    return
+  }
+  if (event.target.closest('button, select')) return
+  if (event.code === 'Space' || event.key === ' ') {
+    event.preventDefault()
+    togglePause()
+  }
 }
 
 onMounted(() => {
