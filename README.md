@@ -33,3 +33,9 @@ npm run build
 支持释义切换、上一词/下一词及熟悉度标记。标记只保留在当前页面会话中，刷新后重置。
 
 GitHub Pages 通过 `.github/workflows/deploy.yml` 在推送至 main 后自动构建部署。
+
+## PWA 安装
+
+生产构建会注册 `public/sw.js`，应用清单和图标位于 `public/manifest.webmanifest` 与 `public/icons/`。首次在线打开网页后，页面资源及使用过的单词录音会逐步缓存，可从浏览器安装到桌面或手机主屏幕。
+
+Android Chrome 或桌面 Chrome/Edge：打开网页后选择“安装应用”。iPhone/iPad Safari：点击分享按钮，再选择“添加到主屏幕”。
