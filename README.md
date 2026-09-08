@@ -1,6 +1,6 @@
 # Aword
 
-Vue 3 + Vite 的基础背单词页面。
+Vue 3 + Vite 的单屏背单词页面，天蓝与白色配色。
 
 ## 本地运行
 
@@ -16,4 +16,20 @@ npm run build
 npm run preview
 ```
 
-包含 5 个示例单词、释义和例句显示、浏览器语音朗读、单词切换与熟悉度标记。标记仅保留在当前页面会话中，刷新后重置。语音可用性取决于浏览器和系统语音支持。
+## 词库
+
+来源：项目根目录的 `四级核心词汇_含例句.xlsx`。读取第一个工作表，按原始顺序导入单词、完整释义及两条例句（英文和中文），共 2329 条。网页使用 `src/data/words.json`，无需在线读取本机 Excel。
+
+更新 Excel 后，运行以下命令刷新网页词库，再构建并提交更新后的 JSON：
+
+```sh
+python -m pip install openpyxl
+python scripts/import_words.py
+npm run build
+```
+
+表格无音标列，页面不显示音标。发音由浏览器系统语音提供，实际可用性取决于系统和浏览器。
+
+支持释义切换、上一词/下一词及熟悉度标记。标记只保留在当前页面会话中，刷新后重置。
+
+GitHub Pages 通过 `.github/workflows/deploy.yml` 在推送至 main 后自动构建部署。
