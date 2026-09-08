@@ -21,7 +21,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: calc(env(safe-area-inset-top) + 82px) 24px calc(env(safe-area-inset-bottom) + 84px);
+  padding: calc(env(safe-area-inset-top) + 82px) 24px calc(env(safe-area-inset-bottom) + 106px);
   overflow: hidden;
 }
 
@@ -132,7 +132,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   position: absolute;
   z-index: 3;
   left: 50%;
-  bottom: max(18px, env(safe-area-inset-bottom));
+  bottom: max(48px, calc(env(safe-area-inset-bottom) + 24px));
   transform: translateX(-50%);
   min-width: 210px;
   padding: 10px 18px;
@@ -159,7 +159,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 
 @media (max-width: 600px) {
   .word-page {
-    padding: calc(env(safe-area-inset-top) + 118px) 16px calc(env(safe-area-inset-bottom) + 80px);
+    padding: calc(env(safe-area-inset-top) + 118px) 16px calc(env(safe-area-inset-bottom) + 92px);
   }
 
   .jump-form {
@@ -185,7 +185,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   .jump-form button { padding-inline: 11px; font-size: 14px; }
   .word-content { font-size: min(var(--word-size), 128px, 22dvh); }
   .details { margin-top: 14px; padding-inline: 0; }
-  .reveal-button { bottom: max(12px, env(safe-area-inset-bottom)); min-width: 200px; }
+  .reveal-button { bottom: max(32px, calc(env(safe-area-inset-bottom) + 16px)); min-width: 200px; }
 }
 
 @media (max-width: 360px) {

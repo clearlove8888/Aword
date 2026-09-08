@@ -96,6 +96,7 @@ function jumpToTarget() {
   index.value = targetIndex
   revealed.value = false
   jumpMessage.value = ''
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   if (resume) playCurrent()
 }
 
@@ -132,11 +133,14 @@ function handleTouchEnd(event) {
 }
 
 function onKeydown(event) {
-  if (event.target.closest('input, button, select')) return
-  if (event.key === '0') {
+  if (event.target.closest('input, textarea')) return
+  if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
+    if (event.repeat) return
+    event.preventDefault()
     revealed.value = !revealed.value
     return
   }
+  if (event.target.closest('button, select')) return
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
   event.preventDefault()
   moveWord(event.key === 'ArrowRight' ? 1 : -1)
