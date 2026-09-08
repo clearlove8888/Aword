@@ -15,7 +15,10 @@ const jumpQuery = ref('')
 const jumpMessage = ref('')
 const current = computed(() => words[index.value])
 const displayStyle = computed(() => ({
-  '--word-size': `${Math.min(18, 145 / Math.max(current.value.word.length, 1)) * textScale.value}vw`,
+  '--word-size': `${Math.min(
+    18 * textScale.value,
+    165 / Math.max(current.value.word.length, 1),
+  )}vw`,
   '--meaning-size': `${38 * textScale.value}px`,
   '--example-size': `${24 * textScale.value}px`,
   '--translation-size': `${20 * textScale.value}px`,
@@ -26,6 +29,7 @@ let touchStartX = 0
 let touchStartY = 0
 let touchStartTime = 0
 let touchEnabled = false
+let ignoreClicksUntil = 0
 
 function stopAudio() {
   requestId++
@@ -50,7 +54,8 @@ async function playCurrent() {
   }
 }
 
-function toggleAudio() {
+function handleWordClick() {
+  if (Date.now() < ignoreClicksUntil) return
   togglePause()
 }
 
@@ -150,7 +155,15 @@ function handleTouchEnd(event) {
   const deltaY = touch.clientY - touchStartY
   const elapsed = Date.now() - touchStartTime
   if (elapsed > 800 || Math.abs(deltaY) < 48 || Math.abs(deltaY) < Math.abs(deltaX) * 1.2) return
+  ignoreClicksUntil = Date.now() + 400
   moveWord(deltaY < 0 ? 1 : -1)
+}
+
+function handlePageClick(event) {
+  if (Date.now() < ignoreClicksUntil) return
+  if (event.target !== event.currentTarget) return
+  const mobilePointer = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900
+  if (mobilePointer) moveWord(1)
 }
 
 function onKeydown(event) {
@@ -207,10 +220,11 @@ onBeforeUnmount(() => {
     :style="displayStyle"
     @touchstart.passive="handleTouchStart"
     @touchend.passive="handleTouchEnd"
+    @click="handlePageClick"
   >
     <h1
       class="word-content"
-      @click="toggleAudio"
+      @click="handleWordClick"
       :title="playing ? '暂停播放' : '播放录音'"
     >{{ current.word }}</h1>
     <div class="word-meta">

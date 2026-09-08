@@ -36,7 +36,9 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   font-weight: 500;
   line-height: 1.12;
   text-align: center;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
   cursor: pointer;
   touch-action: manipulation;
 }
