@@ -149,6 +149,50 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 
 :focus-visible { outline: 2px solid #38a9eb; outline-offset: 3px; }
 
+.study-mode {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f0f7fb;
+}
+.study-mode button, .dictation-panel button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #c5e7fa;
+  border-radius: 8px;
+  background: #fff;
+  color: #258cc6;
+  cursor: pointer;
+}
+.study-mode button { border-color: transparent; background: transparent; }
+.study-mode button[aria-pressed="true"] { background: #fff; color: #167bb9; box-shadow: 0 1px 4px #24445e12; }
+.dictation-page { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.dictation-panel {
+  order: 1;
+  min-height: 0;
+  width: min(100%, 720px);
+  overflow-y: auto;
+  padding: 4px 8px 24px;
+  overscroll-behavior: contain;
+}
+.dictation-hint { margin: 0 0 20px; color: #7193aa; font-size: 14px; text-align: center; }
+.dictation-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.answer-form { margin-top: 22px; }
+.answer-form label { display: block; margin-bottom: 8px; }
+.answer-form input { width: 100%; min-height: 52px; padding: 12px; font-size: 20px; color: #24445e; border: 1px solid #aed8ef; border-radius: 10px; }
+.answer-feedback { min-height: 24px; margin: 10px 0; color: #9c5937; }
+.answer-feedback.correct { color: #208052; }
+.dictation-panel .primary-action { background: #258cc6; border-color: #258cc6; color: #fff; }
+.quiz-answer { margin-top: 24px; text-align: center; }
+
+@media (max-width: 600px) {
+  .word-page.dictation-page { padding-top: calc(env(safe-area-inset-top) + 64px); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .dictation-page .word-meta { top: max(10px, env(safe-area-inset-top)); }
+}
+
 @media (max-width: 900px) {
   .word-page { padding-top: calc(env(safe-area-inset-top) + 118px); }
   .word-meta {
@@ -206,4 +250,43 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 
 @media (max-height: 620px) and (min-width: 901px) {
   .word-page { padding-top: calc(env(safe-area-inset-top) + 66px); }
+}
+
+/* Keep all top controls in document flow so wrapped rows reserve their height. */
+.word-page.has-toolbar { padding-top: max(12px, env(safe-area-inset-top)); }
+.top-toolbar {
+  order: 0;
+  flex: 0 0 auto;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 20px;
+}
+.top-toolbar .jump-form {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.top-toolbar .jump-form input { width: 160px; }
+.top-toolbar .word-meta { position: static; margin-left: auto; flex-wrap: wrap; }
+.top-toolbar .study-mode { flex-shrink: 0; }
+.top-toolbar .jump-message { flex-basis: 100%; }
+.top-toolbar button:disabled, .top-toolbar input:disabled { opacity: .45; cursor: default; }
+.dictation-page .dictation-panel { margin-top: 16px; }
+.dictation-page .word-content { font-size: min(var(--quiz-word-size, 84px), var(--word-size), 18dvh); }
+.meaning-editor { margin-top: 20px; padding: 16px; background: #f0f7fb; border-radius: 12px; }
+.meaning-editor label { display: block; font-weight: 600; }
+.meaning-editor p { font-size: 14px; line-height: 1.5; color: #527b96; }
+.meaning-editor textarea { width: 100%; resize: vertical; padding: 12px; font: inherit; font-size: 18px; border: 1px solid #aed8ef; border-radius: 8px; color: #24445e; }
+.dictation-panel button:disabled { opacity: .45; cursor: default; }
+@media (max-width: 600px) {
+  .top-toolbar .jump-form { width: 100%; }
+  .top-toolbar .jump-form input { flex: 1 1 100px; width: 100px; }
+  .top-toolbar .study-mode { margin-left: auto; }
+  .top-toolbar .word-meta { gap: 6px; font-size: 12px; }
 }
