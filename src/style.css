@@ -172,6 +172,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 .dictation-page { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 .dictation-panel {
   order: 1;
+  flex: 1 1 auto;
   min-height: 0;
   width: min(100%, 720px);
   overflow-y: auto;
@@ -182,7 +183,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 .dictation-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .answer-form { margin-top: 22px; }
 .answer-form label { display: block; margin-bottom: 8px; }
-.answer-form input { width: 100%; min-height: 52px; padding: 12px; font-size: 20px; color: #24445e; border: 1px solid #aed8ef; border-radius: 10px; }
+.answer-entry input { width: 100%; min-height: 52px; padding: 12px; font-size: 20px; color: #24445e; border: 1px solid #aed8ef; border-radius: 10px; }
 .answer-feedback { min-height: 24px; margin: 10px 0; color: #9c5937; }
 .answer-feedback.correct { color: #208052; }
 .dictation-panel .primary-action { background: #258cc6; border-color: #258cc6; color: #fff; }
@@ -279,6 +280,26 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 .top-toolbar button:disabled, .top-toolbar input:disabled { opacity: .45; cursor: default; }
 .dictation-page .dictation-panel { margin-top: 16px; }
 .dictation-page .word-content { font-size: min(var(--quiz-word-size, 84px), var(--word-size), 18dvh); }
+.answer-context {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 16px 4px 24px;
+  margin-bottom: 16px;
+  background: #fff;
+  border-bottom: 1px solid #e5f2fa;
+}
+.quiz-prompt { min-width: 0; container-type: inline-size; }
+.dictation-page .quiz-prompt .word-content { max-width: 100%; font-size: min(var(--quiz-word-size, 84px), var(--quiz-word-fit-size), 18dvh); }
+.answer-entry { min-width: 0; }
+.answer-entry label { display: block; margin-bottom: 8px; font-size: 14px; color: #527b96; }
+@media (max-width: 600px) {
+  .answer-context { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 8px; padding-bottom: 16px; }
+}
 .meaning-editor { margin-top: 20px; padding: 16px; background: #f0f7fb; border-radius: 12px; }
 .meaning-editor label { display: block; font-weight: 600; }
 .meaning-editor p { font-size: 14px; line-height: 1.5; color: #527b96; }

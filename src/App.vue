@@ -157,6 +157,7 @@ const current = computed(() => {
 })
 const displayStyle = computed(() => ({
   '--quiz-word-size': `${84 * textScale.value}px`,
+  '--quiz-word-fit-size': `${150 / Math.max(current.value.word.length, 1)}cqi`,
   '--word-size': `${Math.min(
     18 * textScale.value,
     165 / Math.max(current.value.word.length, 1),
@@ -418,6 +419,7 @@ onBeforeUnmount(() => {
     @click="handlePageClick"
   >
     <h1
+      v-if="!dictation"
       class="word-content"
       @click="handleWordClick"
       :title="playing ? '暂停播放' : '播放录音'"
@@ -456,18 +458,25 @@ onBeforeUnmount(() => {
       {{ revealed ? '隐藏释义与例句' : '显示中文释义与例句' }}
     </button>
     <section v-if="dictation" class="dictation-panel">
+      <div class="answer-context">
+        <div class="quiz-prompt">
+          <h1 class="word-content" @click="handleWordClick" :title="playing ? '暂停播放' : '播放录音'">{{ current.word }}</h1>
+        </div>
+        <div class="answer-entry">
+          <label for="meaning-answer">中文释义</label>
+          <input id="meaning-answer" ref="answerInput" v-model="answer" form="dictation-answer-form" autocomplete="off"
+            placeholder="输入中文释义" :readonly="answerState === 'correct'"
+            @compositionstart="composing = true" @compositionend="composing = false"
+            @keydown.enter="($event.isComposing || composing || $event.keyCode === 229) && $event.preventDefault()" />
+        </div>
+      </div>
       <p class="dictation-hint">看英文，填写任意一个中文含义 · 本轮待复习 {{ reviewWords.size }} 词</p>
       <p class="dictation-hint">0 查看释义 · ← / → 切换单词；输入中按 Esc 后可切换</p>
       <div class="dictation-actions">
         <button type="button" :aria-pressed="playing" @click="togglePause">{{ playing ? '暂停' : '播放' }}</button>
       </div>
       <p v-if="audioMessage" role="status">{{ audioMessage }}</p>
-      <form class="answer-form" @submit.prevent="checkAnswer">
-        
-        <input id="meaning-answer" ref="answerInput" v-model="answer" autocomplete="off"
-          placeholder="输入中文释义" aria-label="中文释义" :readonly="answerState === 'correct'"
-          @compositionstart="composing = true" @compositionend="composing = false"
-          @keydown.enter="($event.isComposing || composing || $event.keyCode === 229) && $event.preventDefault()" />
+      <form id="dictation-answer-form" class="answer-form" @submit.prevent="checkAnswer">
         <p class="answer-feedback" :class="{ correct: answerState === 'correct' }" role="status">{{ answerMessage }}</p>
         <div class="dictation-actions">
           <button type="submit" class="primary-action" :disabled="editingMeaning">{{ answerState === 'correct' ? '下一个单词' : answerState === 'shown' ? '重新检查' : '检查答案' }}</button>
