@@ -179,7 +179,6 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   padding: 4px 8px 24px;
   overscroll-behavior: contain;
 }
-.dictation-hint { margin: 0 0 20px; color: #7193aa; font-size: 14px; text-align: center; }
 .dictation-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .answer-form { margin-top: 22px; }
 .answer-form label { display: block; margin-bottom: 8px; }
@@ -279,7 +278,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 .top-toolbar .jump-message { flex-basis: 100%; }
 .top-toolbar button:disabled, .top-toolbar input:disabled { opacity: .45; cursor: default; }
 .dictation-page .dictation-panel { margin-top: 16px; }
-.dictation-page .word-content { font-size: min(var(--quiz-word-size, 84px), var(--word-size), 18dvh); }
+.dictation-page .word-content { font-size: min(var(--quiz-word-size, 84px), var(--quiz-word-fit-size)); }
 .answer-context {
   position: sticky;
   top: 0;
@@ -294,7 +293,7 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   border-bottom: 1px solid #e5f2fa;
 }
 .quiz-prompt { min-width: 0; container-type: inline-size; }
-.dictation-page .quiz-prompt .word-content { max-width: 100%; font-size: min(var(--quiz-word-size, 84px), var(--quiz-word-fit-size), 18dvh); }
+.dictation-page .quiz-prompt .word-content { max-width: 100%; font-size: min(var(--quiz-word-size, 84px), var(--quiz-word-fit-size)); }
 .answer-entry { min-width: 0; }
 .answer-entry label { display: block; margin-bottom: 8px; font-size: 14px; color: #527b96; }
 @media (max-width: 600px) {

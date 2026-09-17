@@ -131,9 +131,53 @@ test('dictation pause resumes at the same position and new questions auto-play i
   s.dispose()
 })
 
-test('IME, wrong answers, revealing and self-assessment', () => {
+test('revealing the answer preserves playback, position, and a manual pause', async () => {
   const s = createSession()
   s.toggleDictation()
+  await new Promise(setImmediate)
+  s.audio.currentTime = 0.6
+  const source = s.audio.src
+  const playCalls = s.audio.plays.length
+
+  s.showAnswer()
+  assert.equal(s.answerState.value, 'shown')
+  assert.equal(s.playing.value, true)
+  assert.equal(s.audio.paused, false)
+  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.src, source)
+  assert.equal(s.audio.currentTime, 0.6)
+  assert.equal(s.audio.plays.length, playCalls)
+
+  s.onKeyup(keyEvent('0'))
+  assert.equal(s.playing.value, true)
+  assert.equal(s.audio.paused, false)
+
+  await s.togglePause()
+  s.showAnswer()
+  s.onKeyup(keyEvent('0'))
+  assert.equal(s.playing.value, false)
+  assert.equal(s.audio.paused, true)
+  assert.equal(s.audio.currentTime, 0.6)
+  assert.equal(s.audio.plays.length, playCalls)
+  s.dispose()
+})
+
+test('revealing while playback starts does not cancel the pending play request', async () => {
+  const s = createSession()
+  s.toggleDictation()
+  s.onKeyup(keyEvent('0'))
+  await new Promise(setImmediate)
+  assert.equal(s.answerState.value, 'shown')
+  assert.equal(s.playing.value, true)
+  assert.equal(s.audio.paused, false)
+  assert.equal(s.audio.loop, true)
+  s.dispose()
+})
+
+test('IME, wrong answers reveal results immediately, and self-assessment', async () => {
+  const s = createSession()
+  s.toggleDictation()
+  await new Promise(setImmediate)
   s.answer.value = '空间'
   s.composing.value = true
   s.checkAnswer()
@@ -141,12 +185,12 @@ test('IME, wrong answers, revealing and self-assessment', () => {
   s.composing.value = false
   s.answer.value = '地方'
   s.checkAnswer()
-  assert.equal(s.answerState.value, 'incorrect')
+  assert.equal(s.answerState.value, 'shown')
+  assert.match(s.answerMessage.value, /回答错误/)
+  assert.equal(s.playing.value, true)
+  assert.equal(s.audio.paused, false)
   assert.equal(s.index.value, 0)
   assert.equal(s.reviewWords.value.size, 1)
-  assert.equal(s.timers.size, 0)
-  s.showAnswer()
-  assert.equal(s.answerState.value, 'shown')
   assert.equal(s.timers.size, 0)
   s.acceptMyAnswer()
   assert.equal(s.editingMeaning.value, true)

@@ -94,8 +94,9 @@ function checkAnswer() {
   if (isAnswerCorrect(answer.value, current.value)) {
     markCorrect()
   } else {
-    if (answerState.value !== 'shown') answerState.value = 'incorrect'
-    answerMessage.value = '暂未匹配到这个释义，再想一想，也可以查看答案。'
+    clearTimeout(advanceTimer)
+    answerState.value = 'shown'
+    answerMessage.value = '回答错误，正确释义和例句如下。你可以修改答案后重新检查。'
     reviewWords.value.add(current.value.id)
     focusAnswer()
   }
@@ -103,7 +104,6 @@ function checkAnswer() {
 
 function showAnswer() {
   clearTimeout(advanceTimer)
-  stopAudio()
   answerState.value = 'shown'
   answerMessage.value = '已加入待复习，可修改答案后重新检查，或进入下一词'
   reviewWords.value.add(current.value.id)
@@ -157,7 +157,7 @@ const current = computed(() => {
 })
 const displayStyle = computed(() => ({
   '--quiz-word-size': `${84 * textScale.value}px`,
-  '--quiz-word-fit-size': `${150 / Math.max(current.value.word.length, 1)}cqi`,
+  '--quiz-word-fit-size': `${180 / Math.max(current.value.word.length, 1)}cqi`,
   '--word-size': `${Math.min(
     18 * textScale.value,
     165 / Math.max(current.value.word.length, 1),
@@ -470,8 +470,6 @@ onBeforeUnmount(() => {
             @keydown.enter="($event.isComposing || composing || $event.keyCode === 229) && $event.preventDefault()" />
         </div>
       </div>
-      <p class="dictation-hint">看英文，填写任意一个中文含义 · 本轮待复习 {{ reviewWords.size }} 词</p>
-      <p class="dictation-hint">0 查看释义 · ← / → 切换单词；输入中按 Esc 后可切换</p>
       <div class="dictation-actions">
         <button type="button" :aria-pressed="playing" @click="togglePause">{{ playing ? '暂停' : '播放' }}</button>
       </div>
