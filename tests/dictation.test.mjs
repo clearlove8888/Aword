@@ -15,6 +15,7 @@ function createSession(storage = new Map(), failSave = false) {
   let disposed
   let timerId = 0
   const timers = new Map()
+  const timerDelays = new Map()
   class Audio {
     paused = true
     src = ''
@@ -41,8 +42,20 @@ function createSession(storage = new Map(), failSave = false) {
     window: { addEventListener() {}, removeEventListener() {} },
     document: { activeElement: null },
     HTMLElement: class {},
-    setTimeout: fn => { timers.set(++timerId, fn); return timerId },
-    clearTimeout: id => timers.delete(id),
+    setTimeout: (fn, delay) => {
+      const id = ++timerId
+      timers.set(id, () => {
+        timers.delete(id)
+        timerDelays.delete(id)
+        fn()
+      })
+      timerDelays.set(id, delay)
+      return id
+    },
+    clearTimeout: id => {
+      timers.delete(id)
+      timerDelays.delete(id)
+    },
   })
   vm.runInContext(source + `\nglobalThis.session = {
     dictation, answer, answerState, answerMessage, revealed, current, index, composing,
@@ -50,13 +63,13 @@ function createSession(storage = new Map(), failSave = false) {
     nextQuestion, moveWord, handlePageClick, handleAudioEnded, onKeyup, onKeydown,
     jumpToTarget, jumpQuery, jumpMessage,
     editingMeaning, meaningDraft, meaningError, saveMeaning,
-    togglePause, playing,
+    togglePause, playing, playbackRate, updatePlaybackRate, replayDelay,
     favoriteMode, favoriteIds, favoriteWords, activeWords, favoriteMessage,
     isCurrentFavorite, switchMode, toggleFavorite,
     get audio() { return audio },
   }`, context)
   mounted()
-  return { ...context.session, timers, dispose: () => disposed() }
+  return { ...context.session, timers, timerDelays, dispose: () => disposed() }
 }
 
 test('opening the page stays silent until playback is requested', async () => {
@@ -88,7 +101,7 @@ test('dictation loops the current word, waits for an answer, and blocks learning
   const s = createSession()
   s.toggleDictation()
   await Promise.resolve()
-  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.loop, false)
   assert.match(s.audio.src, /000001_en.mp3$/)
   for (let i = 0; i < 5; i++) s.handleAudioEnded()
   s.moveWord(1)
@@ -122,14 +135,41 @@ test('dictation pause resumes at the same position and new questions auto-play i
   assert.equal(s.audio.paused, false)
   assert.equal(s.playing.value, true)
   assert.equal(s.audio.currentTime, 0.6)
-  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.loop, false)
   await s.togglePause()
   s.jumpQuery.value = '2'
   s.jumpToTarget()
   await new Promise(setImmediate)
-  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.loop, false)
   assert.equal(s.playing.value, true)
   assert.match(s.audio.src, /000002_en.mp3$/)
+  s.dispose()
+})
+
+test('playback speed scales audio duration and the replay interval together', async () => {
+  const s = createSession()
+  s.toggleDictation()
+  await new Promise(setImmediate)
+
+  s.handleAudioEnded()
+  assert.equal(s.playing.value, true)
+  assert.equal([...s.timerDelays.values()][0], 800)
+
+  s.playbackRate.value = 2
+  s.updatePlaybackRate()
+  assert.equal(s.audio.playbackRate, 2)
+  assert.equal([...s.timerDelays.values()][0], 400)
+
+  const replay = [...s.timers.values()][0]
+  replay()
+  await new Promise(setImmediate)
+  assert.equal(s.audio.plays.length, 2)
+  assert.equal(s.audio.playbackRate, 2)
+
+  s.handleAudioEnded()
+  s.playbackRate.value = 0.75
+  s.updatePlaybackRate()
+  assert.equal(Math.round([...s.timerDelays.values()][0]), 1067)
   s.dispose()
 })
 
@@ -145,7 +185,7 @@ test('revealing the answer preserves playback, position, and a manual pause', as
   assert.equal(s.answerState.value, 'shown')
   assert.equal(s.playing.value, true)
   assert.equal(s.audio.paused, false)
-  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.loop, false)
   assert.equal(s.audio.src, source)
   assert.equal(s.audio.currentTime, 0.6)
   assert.equal(s.audio.plays.length, playCalls)
@@ -172,7 +212,7 @@ test('revealing while playback starts does not cancel the pending play request',
   assert.equal(s.answerState.value, 'shown')
   assert.equal(s.playing.value, true)
   assert.equal(s.audio.paused, false)
-  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.loop, false)
   s.dispose()
 })
 
@@ -223,7 +263,7 @@ test('manual advance cancels auto advance and leaving mode cancels pending timer
   s.checkAnswer()
   s.toggleDictation()
   assert.equal(s.dictation.value, false)
-  assert.equal(s.audio.loop, true)
+  assert.equal(s.audio.loop, false)
   assert.equal(s.playMode.value, false)
   assert.equal(s.timers.size, 0)
   assert.equal(s.index.value, 1)

@@ -69,7 +69,7 @@ function switchMode(mode) {
   playCount = 0
   dictation.value = mode === 'dictation'
   favoriteMode.value = mode === 'favorites'
-  if (audio) audio.loop = true
+  if (audio) audio.loop = false
   touchEnabled = false
   resetQuestion()
   favoriteMessage.value = ''
@@ -174,9 +174,11 @@ const revealed = ref(false)
 const playMode = ref(false)
 const playbackRate = ref(1)
 const speedOptions = [0.75, 1, 1.25, 1.5, 2]
+const baseReplayDelay = 800
 const textScale = ref(1)
 const textScaleOptions = [0.75, 1, 1.25, 1.5]
 let playCount = 0
+let replayTimer
 const jumpQuery = ref('')
 const jumpMessage = ref('')
 const favoriteWords = computed(() => favoriteIds.value.map(id => wordById.get(id)).filter(Boolean))
@@ -219,6 +221,8 @@ let touchEnabled = false
 let ignoreClicksUntil = 0
 
 function stopAudio() {
+  clearTimeout(replayTimer)
+  replayTimer = undefined
   requestId++
   audio?.pause()
   playing.value = false
@@ -233,7 +237,7 @@ async function playCurrent() {
   const filename = `${String(wordId - 1).padStart(6, '0')}_en.mp3`
   loadedWordId = wordId
   audio.src = `${import.meta.env.BASE_URL}audio/${filename}`
-  audio.loop = dictation.value || !playMode.value
+  audio.loop = false
   audio.playbackRate = playbackRate.value
   audioMessage.value = ''
   try {
@@ -250,7 +254,13 @@ function handleWordClick() {
 }
 
 async function togglePause() {
-  if (!audio) return
+  if (!audio || !current.value) return
+  if (replayTimer) {
+    clearTimeout(replayTimer)
+    replayTimer = undefined
+    playing.value = false
+    return
+  }
   if (loadedWordId !== current.value.id) {
     playCount = 0
     playCurrent()
@@ -281,21 +291,37 @@ async function togglePause() {
 
 function updatePlaybackRate() {
   if (audio) audio.playbackRate = playbackRate.value
+  if (replayTimer) scheduleReplay()
+}
+
+function replayDelay() {
+  return baseReplayDelay / playbackRate.value
+}
+
+function scheduleReplay() {
+  clearTimeout(replayTimer)
+  playing.value = true
+  replayTimer = setTimeout(() => {
+    replayTimer = undefined
+    playCurrent()
+  }, replayDelay())
 }
 
 function handleAudioEnded() {
-  if (dictation.value || !playMode.value) {
+  if (!dictation.value && !playMode.value) {
     playing.value = false
     return
   }
-  playCount += 1
-  if (playCount >= 5) {
-    playCount = 0
-    if (!activeWords.value.length) return
-    index.value = (index.value + 1) % activeWords.value.length
-    revealed.value = false
+  if (playMode.value) {
+    playCount += 1
+    if (playCount >= 5) {
+      playCount = 0
+      if (!activeWords.value.length) return
+      index.value = (index.value + 1) % activeWords.value.length
+      revealed.value = false
+    }
   }
-  playCurrent()
+  scheduleReplay()
 }
 
 function togglePlayMode() {
@@ -362,7 +388,7 @@ function toggleFavorite() {
   const resume = favoriteMode.value && (playing.value || playMode.value)
   if (favoriteMode.value && removing) stopAudio()
   favoriteIds.value = updated
-  favoriteMessage.value = removing ? '已取消收藏' : '已收藏当前单词'
+  favoriteMessage.value = ''
 
   if (favoriteMode.value && removing) {
     index.value = Math.min(index.value, favoriteWords.value.length - 1)
@@ -523,8 +549,8 @@ onBeforeUnmount(() => {
       </button>
       <span class="word-number">{{ current ? index + 1 : 0 }} / {{ activeWords.length }}</span>
       <label class="speed-control">
-        <span>速度</span>
-        <select v-model.number="playbackRate" @change="updatePlaybackRate" aria-label="播放速度">
+        <span>速度/间隔</span>
+        <select v-model.number="playbackRate" @change="updatePlaybackRate" aria-label="播放速度和间隔">
           <option v-for="speed in speedOptions" :key="speed" :value="speed">{{ speed }}×</option>
         </select>
       </label>
