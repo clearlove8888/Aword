@@ -51,6 +51,8 @@ function createSession(storage = new Map(), failSave = false) {
     jumpToTarget, jumpQuery, jumpMessage,
     editingMeaning, meaningDraft, meaningError, saveMeaning,
     togglePause, playing,
+    favoriteMode, favoriteIds, favoriteWords, activeWords, favoriteMessage,
+    isCurrentFavorite, switchMode, toggleFavorite,
     get audio() { return audio },
   }`, context)
   mounted()
@@ -381,5 +383,46 @@ test('after revealing, resubmission checks edits without skipping or hiding the 
   s.showAnswer()
   s.nextQuestion()
   assert.equal(s.index.value, 2)
+  s.dispose()
+})
+
+test('favorites persist in collection order and can be removed from the top action', () => {
+  const storage = new Map()
+  const s = createSession(storage)
+  s.toggleFavorite()
+  assert.equal(s.isCurrentFavorite.value, true)
+  assert.deepEqual([...s.favoriteIds.value], [words[0].id])
+  s.moveWord(2)
+  s.toggleFavorite()
+  assert.deepEqual([...s.favoriteIds.value], [words[0].id, words[2].id])
+  s.toggleFavorite()
+  assert.deepEqual([...s.favoriteIds.value], [words[0].id])
+  s.dispose()
+
+  const restored = createSession(storage)
+  assert.deepEqual([...restored.favoriteIds.value], [words[0].id])
+  restored.dispose()
+})
+
+test('favorite mode navigates only favorites and keeps an explicit empty state', () => {
+  const s = createSession()
+  s.toggleFavorite()
+  s.moveWord(2)
+  s.toggleFavorite()
+  s.switchMode('favorites')
+  assert.equal(s.favoriteMode.value, true)
+  assert.equal(s.current.value.id, words[2].id)
+  assert.equal(s.activeWords.value.length, 2)
+  s.moveWord(1)
+  assert.equal(s.current.value.id, words[0].id)
+  s.jumpQuery.value = '2'
+  s.jumpToTarget()
+  assert.equal(s.current.value.id, words[2].id)
+  s.toggleFavorite()
+  assert.equal(s.current.value.id, words[0].id)
+  s.toggleFavorite()
+  assert.equal(s.current.value, null)
+  assert.equal(s.favoriteMode.value, true)
+  assert.equal(s.activeWords.value.length, 0)
   s.dispose()
 })

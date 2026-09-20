@@ -56,6 +56,38 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
 }
 
 .word-number { font-variant-numeric: tabular-nums; }
+.favorite-toggle {
+  min-height: 36px;
+  padding: 5px 10px;
+  border: 1px solid #c5e7fa;
+  border-radius: 8px;
+  color: #258cc6;
+  background: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.favorite-toggle:hover { background: #edf8ff; }
+.favorite-toggle.active { color: #9a6411; border-color: #e8c36a; background: #fff9e8; }
+.favorite-toggle:disabled { opacity: .45; cursor: default; }
+.favorite-message {
+  order: 1;
+  min-height: 20px;
+  margin: -10px 0 10px;
+  color: #527b96;
+  font-size: 14px;
+}
+.empty-favorites {
+  order: 1;
+  flex: 1 1 auto;
+  display: grid;
+  place-content: center;
+  max-width: 440px;
+  padding: 24px;
+  text-align: center;
+  color: #527b96;
+}
+.empty-favorites h1 { margin: 0 0 10px; color: #24445e; font-size: 28px; letter-spacing: 0; }
+.empty-favorites p { margin: 0; line-height: 1.6; }
 .speed-control, .size-control { display: flex; align-items: center; gap: 6px; }
 .speed-control select, .size-control select {
   min-height: 36px;
@@ -309,4 +341,20 @@ button, input, select { font: inherit; -webkit-tap-highlight-color: transparent;
   .top-toolbar .jump-form input { flex: 1 1 100px; width: 100px; }
   .top-toolbar .study-mode { margin-left: auto; }
   .top-toolbar .word-meta { gap: 6px; font-size: 12px; }
+}
+
+@media (min-width: 901px) {
+  .word-content { font-size: min(var(--desktop-word-size), 120px, 12.5dvh); }
+  .dictation-page .word-content,
+  .dictation-page .quiz-prompt .word-content {
+    font-size: min(var(--desktop-quiz-word-size), var(--desktop-quiz-word-fit-size));
+  }
+  .meaning { font-size: min(var(--desktop-meaning-size), 60px, 6.25dvh); }
+  .dictation-page .meaning { font-size: var(--desktop-quiz-meaning-size); }
+  .example p + p { font-size: var(--example-size); }
+}
+
+@media (min-width: 901px) and (max-height: 620px) {
+  .word-content { font-size: min(var(--desktop-word-size), 48px, 10dvh); }
+  .details .meaning { font-size: min(var(--desktop-meaning-size), 24px, 5dvh); }
 }

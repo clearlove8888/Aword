@@ -3,8 +3,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import words from './data/words.json'
 import { isAnswerCorrect, meaningAnswers } from './answer-check.js'
 
+const wordById = new Map(words.map(word => [word.id, word]))
 const index = ref(0)
 const dictation = ref(false)
+const favoriteMode = ref(false)
 const answer = ref('')
 const answerInput = ref(null)
 const answerState = ref('idle')
@@ -13,7 +15,10 @@ const composing = ref(false)
 const audioMessage = ref('')
 const reviewWords = ref(new Set())
 const meaningStorageKey = 'aword-custom-meanings-v1'
+const favoriteStorageKey = 'aword-favorites-v1'
 const customMeanings = ref(readCustomMeanings())
+const favoriteIds = ref(readFavorites())
+const favoriteMessage = ref('')
 const editingMeaning = ref(false)
 const meaningDraft = ref('')
 const meaningEditor = ref(null)
@@ -26,6 +31,16 @@ function readCustomMeanings() {
     return Object.fromEntries(Object.entries(saved).filter(([, value]) => typeof value === 'string' && value.trim()))
   } catch {
     return {}
+  }
+}
+
+function readFavorites() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(favoriteStorageKey) || '[]')
+    if (!Array.isArray(saved)) return []
+    return [...new Set(saved.filter(id => Number.isInteger(id) && wordById.has(id)))]
+  } catch {
+    return []
   }
 }
 let advanceTimer
@@ -47,18 +62,30 @@ function focusAnswer() {
   nextTick(() => answerInput.value?.focus({ preventScroll: true }))
 }
 
-function toggleDictation() {
+function switchMode(mode) {
+  const currentId = current.value?.id
   stopAudio()
   playMode.value = false
   playCount = 0
-  dictation.value = !dictation.value
+  dictation.value = mode === 'dictation'
+  favoriteMode.value = mode === 'favorites'
   if (audio) audio.loop = true
   touchEnabled = false
   resetQuestion()
+  favoriteMessage.value = ''
+
+  const nextWords = activeWords.value
+  const matchingIndex = nextWords.findIndex(word => word.id === currentId)
+  index.value = matchingIndex >= 0 ? matchingIndex : 0
+
   if (dictation.value) {
     playCurrent()
     focusAnswer()
   }
+}
+
+function toggleDictation() {
+  switchMode(dictation.value ? 'study' : 'dictation')
 }
 
 function nextQuestion() {
@@ -69,9 +96,10 @@ function nextQuestion() {
 
 function moveQuestion(step) {
   if (!dictation.value || editingMeaning.value) return
+  if (!activeWords.value.length) return
   stopAudio()
   playCount = 0
-  index.value = (index.value + step + words.length) % words.length
+  index.value = (index.value + step + activeWords.value.length) % activeWords.value.length
   resetQuestion()
   playCurrent()
   focusAnswer()
@@ -151,17 +179,32 @@ const textScaleOptions = [0.75, 1, 1.25, 1.5]
 let playCount = 0
 const jumpQuery = ref('')
 const jumpMessage = ref('')
+const favoriteWords = computed(() => favoriteIds.value.map(id => wordById.get(id)).filter(Boolean))
+const activeWords = computed(() => favoriteMode.value ? favoriteWords.value : words)
 const current = computed(() => {
-  const word = words[index.value]
+  const word = activeWords.value[index.value]
+  if (!word) return null
   return { ...word, meaning: customMeanings.value[word.word] ?? word.meaning }
 })
+const isCurrentFavorite = computed(() => current.value ? favoriteIds.value.includes(current.value.id) : false)
 const displayStyle = computed(() => ({
   '--quiz-word-size': `${84 * textScale.value}px`,
-  '--quiz-word-fit-size': `${180 / Math.max(current.value.word.length, 1)}cqi`,
+  '--quiz-word-fit-size': `${180 / Math.max(current.value?.word.length || 1, 1)}cqi`,
+  '--desktop-quiz-word-fit-size': `${90 / Math.max(current.value?.word.length || 1, 1)}cqi`,
   '--word-size': `${Math.min(
     18 * textScale.value,
-    165 / Math.max(current.value.word.length, 1),
+    165 / Math.max(current.value?.word.length || 1, 1),
   )}vw`,
+  '--desktop-word-size': `${Math.min(
+    18 * textScale.value,
+    165 / Math.max(current.value?.word.length || 1, 1),
+  ) * 0.5}vw`,
+  '--desktop-meaning-size': `${Math.min(
+    18 * textScale.value,
+    165 / Math.max(current.value?.word.length || 1, 1),
+  ) * 0.25}vw`,
+  '--desktop-quiz-word-size': `${84 * textScale.value * 0.5}px`,
+  '--desktop-quiz-meaning-size': `${84 * textScale.value * 0.25}px`,
   '--meaning-size': `${38 * textScale.value}px`,
   '--example-size': `${24 * textScale.value}px`,
   '--translation-size': `${20 * textScale.value}px`,
@@ -182,7 +225,7 @@ function stopAudio() {
 }
 
 async function playCurrent() {
-  if (!audio) return
+  if (!audio || !current.value) return
   const request = ++requestId
   audio.pause()
   playing.value = false
@@ -248,14 +291,15 @@ function handleAudioEnded() {
   playCount += 1
   if (playCount >= 5) {
     playCount = 0
-    index.value = (index.value + 1) % words.length
+    if (!activeWords.value.length) return
+    index.value = (index.value + 1) % activeWords.value.length
     revealed.value = false
   }
   playCurrent()
 }
 
 function togglePlayMode() {
-  if (dictation.value) return
+  if (dictation.value || !current.value) return
   playMode.value = !playMode.value
   playCount = 0
   stopAudio()
@@ -267,10 +311,10 @@ function jumpToTarget() {
   if (!query) return
   const numeric = /^\d+$/.test(query) ? Number(query) : null
   let targetIndex = numeric !== null
-    ? (numeric >= 1 && numeric <= words.length ? numeric - 1 : -1)
-    : words.findIndex((item) => item.word.toLowerCase() === query.toLowerCase())
+    ? (numeric >= 1 && numeric <= activeWords.value.length ? numeric - 1 : -1)
+    : activeWords.value.findIndex((item) => item.word.toLowerCase() === query.toLowerCase())
   if (targetIndex < 0) {
-    jumpMessage.value = numeric !== null ? `请输入 1-${words.length} 之间的序号` : '没有找到这个单词'
+    jumpMessage.value = numeric !== null ? `请输入 1-${activeWords.value.length} 之间的序号` : '当前列表中没有这个单词'
     return
   }
   const resume = playing.value
@@ -280,6 +324,7 @@ function jumpToTarget() {
   if (dictation.value) resetQuestion()
   revealed.value = false
   jumpMessage.value = ''
+  favoriteMessage.value = ''
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   if (dictation.value) {
     playCurrent()
@@ -289,12 +334,43 @@ function jumpToTarget() {
 
 function moveWord(step) {
   if (dictation.value) return
+  if (!activeWords.value.length) return
   const resume = playing.value
   stopAudio()
   playCount = 0
-  index.value = (index.value + step + words.length) % words.length
+  index.value = (index.value + step + activeWords.value.length) % activeWords.value.length
   revealed.value = false
+  favoriteMessage.value = ''
   if (resume || playMode.value) playCurrent()
+}
+
+function toggleFavorite() {
+  if (!current.value) return
+  const currentId = current.value.id
+  const removing = favoriteIds.value.includes(currentId)
+  const updated = removing
+    ? favoriteIds.value.filter(id => id !== currentId)
+    : [...favoriteIds.value, currentId]
+
+  try {
+    localStorage.setItem(favoriteStorageKey, JSON.stringify(updated))
+  } catch {
+    favoriteMessage.value = '浏览器未能保存收藏，请检查是否允许本地存储后重试。'
+    return
+  }
+
+  const resume = favoriteMode.value && (playing.value || playMode.value)
+  if (favoriteMode.value && removing) stopAudio()
+  favoriteIds.value = updated
+  favoriteMessage.value = removing ? '已取消收藏' : '已收藏当前单词'
+
+  if (favoriteMode.value && removing) {
+    index.value = Math.min(index.value, favoriteWords.value.length - 1)
+    if (index.value < 0) index.value = 0
+    revealed.value = false
+    if (!favoriteWords.value.length) playMode.value = false
+    else if (resume) playCurrent()
+  }
 }
 
 function handleTouchStart(event) {
@@ -419,7 +495,7 @@ onBeforeUnmount(() => {
     @click="handlePageClick"
   >
     <h1
-      v-if="!dictation"
+      v-if="!dictation && current"
       class="word-content"
       @click="handleWordClick"
       :title="playing ? '暂停播放' : '播放录音'"
@@ -427,19 +503,25 @@ onBeforeUnmount(() => {
     <header class="top-toolbar">
     <form class="jump-form" @submit.prevent="jumpToTarget">
       <label for="jump-query">跳转到</label>
-      <input id="jump-query" v-model="jumpQuery" type="text" inputmode="text" placeholder="输入序号或单词" autocomplete="off" />
-      <button type="submit">跳转</button>
-      <button type="button" class="mode-toggle" :disabled="dictation" :aria-pressed="playMode" @click="togglePlayMode">
+      <input id="jump-query" v-model="jumpQuery" type="text" inputmode="text" placeholder="输入序号或单词" autocomplete="off" :disabled="!current" />
+      <button type="submit" :disabled="!current">跳转</button>
+      <button type="button" class="mode-toggle" :disabled="dictation || !current" :aria-pressed="playMode" @click="togglePlayMode">
         {{ playMode ? '停止播放模式' : '播放模式' }}
       </button>
       <div class="study-mode" role="group" aria-label="学习模式">
-        <button type="button" :aria-pressed="!dictation" @click="dictation && toggleDictation()">学习模式</button>
-        <button type="button" :aria-pressed="dictation" @click="!dictation && toggleDictation()">听音写义</button>
+        <button type="button" :aria-pressed="!dictation && !favoriteMode" @click="switchMode('study')">学习模式</button>
+        <button type="button" :aria-pressed="dictation" @click="switchMode('dictation')">听音写义</button>
+        <button type="button" :aria-pressed="favoriteMode" @click="switchMode('favorites')">收藏模式</button>
       </div>
       <p v-if="jumpMessage" class="jump-message" role="status">{{ jumpMessage }}</p>
     </form>
     <div class="word-meta">
-      <span class="word-number">{{ index + 1 }} / {{ words.length }}</span>
+      <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }" :disabled="!current"
+        :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
+        <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
+        {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
+      </button>
+      <span class="word-number">{{ current ? index + 1 : 0 }} / {{ activeWords.length }}</span>
       <label class="speed-control">
         <span>速度</span>
         <select v-model.number="playbackRate" @change="updatePlaybackRate" aria-label="播放速度">
@@ -454,10 +536,15 @@ onBeforeUnmount(() => {
       </label>
     </div>
     </header>
-    <button v-if="!dictation" class="reveal-button" @click="revealed = !revealed">
+    <p v-if="favoriteMessage" class="favorite-message" role="status">{{ favoriteMessage }}</p>
+    <section v-if="favoriteMode && !current" class="empty-favorites" aria-live="polite">
+      <h1>暂无收藏单词</h1>
+      <p>切换到学习模式，在顶部点击“收藏”添加单词。</p>
+    </section>
+    <button v-if="!dictation && current" class="reveal-button" @click="revealed = !revealed">
       {{ revealed ? '隐藏释义与例句' : '显示中文释义与例句' }}
     </button>
-    <section v-if="dictation" class="dictation-panel">
+    <section v-if="dictation && current" class="dictation-panel">
       <div class="answer-context">
         <div class="quiz-prompt">
           <h1 class="word-content" @click="handleWordClick" :title="playing ? '暂停播放' : '播放录音'">{{ current.word }}</h1>
@@ -503,7 +590,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </section>
-    <section v-if="!dictation && revealed" class="details" aria-live="polite">
+    <section v-if="!dictation && current && revealed" class="details" aria-live="polite">
       <p class="meaning">{{ current.meaning }}</p>
       <div class="examples">
         <div v-if="current.example" class="example">
