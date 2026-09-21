@@ -153,12 +153,12 @@ test('playback speed scales audio duration and the replay interval together', as
 
   s.handleAudioEnded()
   assert.equal(s.playing.value, true)
-  assert.equal([...s.timerDelays.values()][0], 800)
+  assert.equal([...s.timerDelays.values()][0], 400)
 
   s.playbackRate.value = 2
   s.updatePlaybackRate()
   assert.equal(s.audio.playbackRate, 2)
-  assert.equal([...s.timerDelays.values()][0], 400)
+  assert.equal([...s.timerDelays.values()][0], 200)
 
   const replay = [...s.timers.values()][0]
   replay()
@@ -169,7 +169,7 @@ test('playback speed scales audio duration and the replay interval together', as
   s.handleAudioEnded()
   s.playbackRate.value = 0.75
   s.updatePlaybackRate()
-  assert.equal(Math.round([...s.timerDelays.values()][0]), 1067)
+  assert.equal(Math.round([...s.timerDelays.values()][0]), 533)
   s.dispose()
 })
 
