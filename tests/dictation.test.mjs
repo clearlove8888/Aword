@@ -6,6 +6,8 @@ import { ref, computed } from 'vue'
 import { isAnswerCorrect, meaningAnswers } from '../src/answer-check.js'
 
 const words = JSON.parse(readFileSync(new URL('../src/data/words.json', import.meta.url)))
+const frequencyWords = JSON.parse(readFileSync(new URL('../src/data/cet4-frequency-1616.json', import.meta.url)))
+const listeningWords = JSON.parse(readFileSync(new URL('../src/data/cet4-listening-1000.json', import.meta.url)))
 const source = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
   .split('<script setup>')[1].split('</script>')[0]
   .replace(/^import .*$/gm, '').replaceAll('import.meta.env.BASE_URL', "'/Aword/'")
@@ -28,7 +30,7 @@ function createSession(storage = new Map(), failSave = false) {
     load() {}
   }
   const context = vm.createContext({
-    ref, computed, words, isAnswerCorrect, meaningAnswers, Audio,
+    ref, computed, words, frequencyWords, listeningWords, isAnswerCorrect, meaningAnswers, Audio,
     localStorage: {
       getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => {
@@ -58,29 +60,32 @@ function createSession(storage = new Map(), failSave = false) {
     },
   })
   vm.runInContext(source + `\nglobalThis.session = {
-    dictation, answer, answerState, answerMessage, revealed, current, index, composing,
+    dictation, answer, answerState, answerMessage, revealed, current, index, composing, audioMessage,
     reviewWords, playMode, toggleDictation, checkAnswer, showAnswer, acceptMyAnswer,
-    nextQuestion, moveWord, handlePageClick, handleAudioEnded, onKeyup, onKeydown,
+    nextQuestion, moveWord, handlePageClick, handleTouchStart, handleTouchEnd, handleAudioEnded, onKeyup, onKeydown,
     jumpToTarget, jumpQuery, jumpMessage,
     editingMeaning, meaningDraft, meaningError, saveMeaning,
     togglePause, playing, playbackRate, updatePlaybackRate, replayDelay,
     favoriteMode, favoriteIds, favoriteWords, activeWords, favoriteMessage,
     isCurrentFavorite, switchMode, toggleFavorite,
+    selectedLibrary, libraryWords, changeLibrary, saveProgress,
     get audio() { return audio },
   }`, context)
   mounted()
   return { ...context.session, timers, timerDelays, dispose: () => disposed() }
 }
 
-test('opening the page stays silent until playback is requested', async () => {
+test('opening the page automatically plays once and keeps manual playback available', async () => {
   const s = createSession()
   await new Promise(setImmediate)
-  assert.equal(s.audio.plays.length, 0)
+  assert.equal(s.audio.plays.length, 1)
+  assert.equal(s.audio.paused, false)
+  assert.equal(s.playing.value, true)
+  await s.togglePause()
   assert.equal(s.audio.paused, true)
-  assert.equal(s.playing.value, false)
   await s.togglePause()
   await new Promise(setImmediate)
-  assert.equal(s.audio.plays.length, 1)
+  assert.equal(s.audio.plays.length, 2)
   assert.equal(s.playing.value, true)
   assert.match(s.audio.src, /000001_en.mp3$/)
   s.dispose()
@@ -163,7 +168,7 @@ test('playback speed scales audio duration and the replay interval together', as
   const replay = [...s.timers.values()][0]
   replay()
   await new Promise(setImmediate)
-  assert.equal(s.audio.plays.length, 2)
+  assert.equal(s.audio.plays.length, 3)
   assert.equal(s.audio.playbackRate, 2)
 
   s.handleAudioEnded()
@@ -465,4 +470,126 @@ test('favorite mode navigates only favorites and keeps an explicit empty state',
   assert.equal(s.favoriteMode.value, true)
   assert.equal(s.activeWords.value.length, 0)
   s.dispose()
+})
+
+test('horizontal swipes navigate left to next and right to previous without hijacking vertical scroll', () => {
+  const s = createSession()
+  const touch = (x, y, interactive = false) => ({
+    changedTouches: [{ clientX: x, clientY: y }],
+    target: { closest: () => interactive ? {} : null },
+  })
+
+  s.moveWord(1)
+  assert.equal(s.index.value, 1)
+  s.handleTouchStart(touch(240, 120))
+  s.handleTouchEnd(touch(120, 126))
+  assert.equal(s.index.value, 2)
+
+  s.handleTouchStart(touch(100, 120))
+  s.handleTouchEnd(touch(230, 126))
+  assert.equal(s.index.value, 1)
+
+  s.handleTouchStart(touch(120, 100))
+  s.handleTouchEnd(touch(128, 220))
+  assert.equal(s.index.value, 1)
+
+  s.handleTouchStart(touch(230, 120, true))
+  s.handleTouchEnd(touch(100, 120, true))
+  assert.equal(s.index.value, 1)
+  s.dispose()
+})
+
+test('frequency library contains exactly 1616 unique ranked words with linked detail sections', () => {
+  assert.equal(frequencyWords.length, 1616)
+  assert.equal(new Set(frequencyWords.map(item => item.word.toLowerCase())).size, 1616)
+  assert.deepEqual(frequencyWords.map(item => item.rank), Array.from({ length: 1616 }, (_, index) => index + 1))
+  assert.equal(frequencyWords[0].word, 'would')
+  assert.ok(frequencyWords[0].meaning)
+  assert.ok(frequencyWords[0].meanings.length)
+  assert.ok(frequencyWords[0].analysis.length)
+  assert.ok(frequencyWords[0].forms.length)
+  assert.ok(frequencyWords[0].collocations.length)
+  assert.ok(frequencyWords[0].meanings[0].examples[0].text)
+  assert.equal(frequencyWords[0].meanings[0].examples[0].translation, '')
+})
+
+test('listening library contains 1000 words with separate sense rows and requests British audio', async () => {
+  assert.equal(listeningWords.length, 1000)
+  assert.equal(new Set(listeningWords.map(item => item.word.toLowerCase())).size, 1000)
+  assert.ok(listeningWords.every(item => item.meanings?.length && item.meanings.every(sense => sense.partOfSpeech && sense.meaning)))
+
+  const s = createSession()
+  s.changeLibrary('cet4-listening-1000')
+  await new Promise(setImmediate)
+  assert.equal(s.selectedLibrary.value, 'cet4-listening-1000')
+  assert.equal(s.activeWords.value.length, 1751)
+  assert.equal(s.current.value.word, 'person')
+  assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=person&type=2')
+  assert.equal(s.revealed.value, true)
+  const people = s.libraryWords.value.find(item => item.word === 'people')
+  assert.equal(people.formOf, 'person')
+  assert.equal(people.formGrammar, '词形')
+  assert.equal(people.meanings[0].meaning, '人')
+  assert.equal(people.meanings[0].count, 0)
+  s.jumpQuery.value = 'parents'
+  s.jumpToTarget()
+  assert.equal(s.current.value.word, 'parents')
+  assert.equal(s.current.value.formOf, 'parent')
+  assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=parents&type=2')
+  s.dispose()
+})
+
+test('playing a listening word also reads its listed forms in sequence', async () => {
+  const s = createSession()
+  s.changeLibrary('cet4-listening-1000')
+  s.jumpQuery.value = 'far'
+  s.jumpToTarget()
+  assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=far&type=2')
+  s.handleAudioEnded()
+  assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=further&type=2')
+  await Promise.resolve()
+  assert.equal(s.playing.value, true)
+  s.dispose()
+})
+
+test('listening word definitions use the original centered Chinese meaning style', () => {
+  const details = readFileSync(new URL('../src/components/WordDetails.vue', import.meta.url), 'utf8')
+  const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
+  assert.match(details, /v-if="isListeningWord" class="listening-summary-section"/)
+  assert.match(details, /class="meaning"/)
+  assert.match(details, /v-else class="detail-section summary-section"/)
+  assert.doesNotMatch(details, /audio-source-note/)
+  assert.match(details, /class="detail-list sense-list"/)
+  assert.match(app, /词性变化：\{\{ current\.formOf \}\}/)
+  assert.match(app, /listening-word-forms/)
+})
+
+test('library progress and favorites persist independently and restore on re-entry', () => {
+  const storage = new Map()
+  const s = createSession(storage)
+  s.toggleFavorite()
+  s.moveWord(4)
+  assert.equal(storage.get('aword-progress-core-v1'), '4')
+
+  s.changeLibrary('cet4-frequency-1616')
+  assert.equal(s.selectedLibrary.value, 'cet4-frequency-1616')
+  assert.equal(s.activeWords.value.length, 1616)
+  assert.equal(s.current.value.word, 'would')
+  assert.deepEqual([...s.favoriteIds.value], [])
+  s.toggleFavorite()
+  s.jumpQuery.value = '17'
+  s.jumpToTarget()
+  assert.equal(s.index.value, 16)
+  assert.equal(storage.get('aword-progress-cet4-frequency-1616-v1'), '16')
+  assert.equal(storage.get('aword-favorites-cet4-frequency-1616-v1'), '[1]')
+  s.dispose()
+
+  const restored = createSession(storage)
+  assert.equal(restored.selectedLibrary.value, 'cet4-frequency-1616')
+  assert.equal(restored.index.value, 16)
+  assert.deepEqual([...restored.favoriteIds.value], [1])
+  restored.changeLibrary('core')
+  assert.equal(restored.index.value, 4)
+  assert.deepEqual([...restored.favoriteIds.value], [words[0].id])
+  restored.dispose()
 })

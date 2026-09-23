@@ -1,10 +1,109 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import words from './data/words.json'
+import frequencyWords from './data/cet4-frequency-1616.json'
+import listeningWords from './data/cet4-listening-1000.json'
 import { isAnswerCorrect, meaningAnswers } from './answer-check.js'
+import WordDetails from './components/WordDetails.vue'
 
-const wordById = new Map(words.map(word => [word.id, word]))
-const index = ref(0)
+function expandListeningWords(items) {
+  const expanded = [...items]
+  const seen = new Set(items.map(item => item.word.toLocaleLowerCase()))
+  let nextId = Math.max(...items.map(item => item.id))
+
+  for (const parent of items) {
+    for (const form of parent.forms || []) {
+      const word = form.form?.trim()
+      const key = word?.toLocaleLowerCase()
+      if (!word || seen.has(key)) continue
+      seen.add(key)
+      nextId += 1
+      expanded.push({
+        ...parent,
+        id: nextId,
+        word,
+        meaning: parent.meaning,
+        meanings: (parent.meanings || []).map(item => ({
+          ...item,
+          partOfSpeech: form.partOfSpeech || item.partOfSpeech,
+          count: 0,
+        })),
+        forms: [],
+        frequency: 0,
+        formOf: parent.word,
+        formGrammar: form.grammar || '词形',
+        formPartOfSpeech: form.partOfSpeech || '',
+      })
+    }
+  }
+
+  return expanded
+}
+
+const expandedListeningWords = expandListeningWords(listeningWords)
+const libraryStorageKey = 'aword-selected-library-v1'
+const libraryOptions = [
+  { id: 'core', label: '四级核心词汇' },
+  { id: 'cet4-frequency-1616', label: '四级高频1616词' },
+  { id: 'cet4-listening-1000', label: '四级听力1000词（英音）' },
+]
+const storageKeys = {
+  core: {
+    meanings: 'aword-custom-meanings-v1',
+    favorites: 'aword-favorites-v1',
+    progress: 'aword-progress-core-v1',
+  },
+  'cet4-frequency-1616': {
+    meanings: 'aword-custom-meanings-cet4-frequency-1616-v1',
+    favorites: 'aword-favorites-cet4-frequency-1616-v1',
+    progress: 'aword-progress-cet4-frequency-1616-v1',
+  },
+  'cet4-listening-1000': {
+    meanings: 'aword-custom-meanings-cet4-listening-1000-v1',
+    favorites: 'aword-favorites-cet4-listening-1000-v1',
+    progress: 'aword-progress-cet4-listening-1000-v1',
+  },
+}
+
+function readSelectedLibrary() {
+  try {
+    const saved = localStorage.getItem(libraryStorageKey)
+    return storageKeys[saved] ? saved : 'core'
+  } catch {
+    return 'core'
+  }
+}
+
+const selectedLibrary = ref(readSelectedLibrary())
+const libraryWords = computed(() => {
+  if (selectedLibrary.value === 'cet4-frequency-1616') return frequencyWords
+  if (selectedLibrary.value === 'cet4-listening-1000') return expandedListeningWords
+  return words
+})
+const wordById = computed(() => new Map(libraryWords.value.map(word => [word.id, word])))
+
+function readProgress(library = selectedLibrary.value) {
+  try {
+    const value = Number(localStorage.getItem(storageKeys[library].progress))
+    const length = library === 'cet4-frequency-1616'
+      ? frequencyWords.length
+      : library === 'cet4-listening-1000' ? expandedListeningWords.length : words.length
+    return Number.isInteger(value) && value >= 0 && value < length ? value : 0
+  } catch {
+    return 0
+  }
+}
+
+function saveProgress() {
+  if (favoriteMode.value) return
+  try {
+    localStorage.setItem(storageKeys[selectedLibrary.value].progress, String(index.value))
+  } catch {
+    favoriteMessage.value = '浏览器未能保存学习进度，请检查是否允许本地存储。'
+  }
+}
+
+const index = ref(readProgress())
 const dictation = ref(false)
 const favoriteMode = ref(false)
 const answer = ref('')
@@ -14,8 +113,6 @@ const answerMessage = ref('')
 const composing = ref(false)
 const audioMessage = ref('')
 const reviewWords = ref(new Set())
-const meaningStorageKey = 'aword-custom-meanings-v1'
-const favoriteStorageKey = 'aword-favorites-v1'
 const customMeanings = ref(readCustomMeanings())
 const favoriteIds = ref(readFavorites())
 const favoriteMessage = ref('')
@@ -23,10 +120,12 @@ const editingMeaning = ref(false)
 const meaningDraft = ref('')
 const meaningEditor = ref(null)
 const meaningError = ref('')
+const moreOpen = ref(false)
+const detailsPanel = ref(null)
 
 function readCustomMeanings() {
   try {
-    const saved = JSON.parse(localStorage.getItem(meaningStorageKey) || '{}')
+    const saved = JSON.parse(localStorage.getItem(storageKeys[selectedLibrary.value].meanings) || '{}')
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {}
     return Object.fromEntries(Object.entries(saved).filter(([, value]) => typeof value === 'string' && value.trim()))
   } catch {
@@ -36,9 +135,9 @@ function readCustomMeanings() {
 
 function readFavorites() {
   try {
-    const saved = JSON.parse(localStorage.getItem(favoriteStorageKey) || '[]')
+    const saved = JSON.parse(localStorage.getItem(storageKeys[selectedLibrary.value].favorites) || '[]')
     if (!Array.isArray(saved)) return []
-    return [...new Set(saved.filter(id => Number.isInteger(id) && wordById.has(id)))]
+    return [...new Set(saved.filter(id => Number.isInteger(id) && wordById.value.has(id)))]
   } catch {
     return []
   }
@@ -55,7 +154,20 @@ function resetQuestion() {
   answerMessage.value = ''
   composing.value = false
   audioMessage.value = ''
-  revealed.value = false
+  revealed.value = selectedLibrary.value === 'cet4-listening-1000' && !dictation.value
+  resetDetailsPosition()
+}
+
+function resetDetailsPosition() {
+  nextTick(() => {
+    if (detailsPanel.value) detailsPanel.value.scrollTop = 0
+    if (typeof window !== 'undefined' && window.innerWidth <= 600) window.scrollTo({ top: 0, behavior: 'auto' })
+  })
+}
+
+function toggleReveal() {
+  revealed.value = !revealed.value
+  if (revealed.value) nextTick(() => { if (detailsPanel.value) detailsPanel.value.scrollTop = 0 })
 }
 
 function focusAnswer() {
@@ -73,15 +185,37 @@ function switchMode(mode) {
   touchEnabled = false
   resetQuestion()
   favoriteMessage.value = ''
+  moreOpen.value = false
 
   const nextWords = activeWords.value
   const matchingIndex = nextWords.findIndex(word => word.id === currentId)
   index.value = matchingIndex >= 0 ? matchingIndex : 0
+  saveProgress()
 
-  if (dictation.value) {
-    playCurrent()
-    focusAnswer()
-  }
+  playCurrent()
+  if (dictation.value) focusAnswer()
+}
+
+function changeLibrary(library) {
+  if (!storageKeys[library] || library === selectedLibrary.value) return
+  saveProgress()
+  stopAudio()
+  playMode.value = false
+  playCount = 0
+  dictation.value = false
+  favoriteMode.value = false
+  selectedLibrary.value = library
+  try { localStorage.setItem(libraryStorageKey, library) } catch { /* The app remains usable without persistence. */ }
+  customMeanings.value = readCustomMeanings()
+  favoriteIds.value = readFavorites()
+  reviewWords.value = new Set()
+  index.value = readProgress(library)
+  jumpQuery.value = ''
+  jumpMessage.value = ''
+  favoriteMessage.value = ''
+  moreOpen.value = false
+  resetQuestion()
+  playCurrent()
 }
 
 function toggleDictation() {
@@ -100,6 +234,7 @@ function moveQuestion(step) {
   stopAudio()
   playCount = 0
   index.value = (index.value + step + activeWords.value.length) % activeWords.value.length
+  saveProgress()
   resetQuestion()
   playCurrent()
   focusAnswer()
@@ -159,7 +294,7 @@ function saveMeaning() {
   }
   const updated = { ...customMeanings.value, [current.value.word]: value }
   try {
-    localStorage.setItem(meaningStorageKey, JSON.stringify(updated))
+    localStorage.setItem(storageKeys[selectedLibrary.value].meanings, JSON.stringify(updated))
   } catch {
     meaningError.value = '浏览器未能保存，请检查是否允许本地存储后重试。'
     return
@@ -170,7 +305,7 @@ function saveMeaning() {
   markCorrect()
 }
 const playing = ref(false)
-const revealed = ref(false)
+const revealed = ref(selectedLibrary.value === 'cet4-listening-1000')
 const playMode = ref(false)
 const playbackRate = ref(1)
 const speedOptions = [0.75, 1, 1.25, 1.5, 2]
@@ -181,12 +316,22 @@ let playCount = 0
 let replayTimer
 const jumpQuery = ref('')
 const jumpMessage = ref('')
-const favoriteWords = computed(() => favoriteIds.value.map(id => wordById.get(id)).filter(Boolean))
-const activeWords = computed(() => favoriteMode.value ? favoriteWords.value : words)
+const favoriteWords = computed(() => favoriteIds.value.map(id => wordById.value.get(id)).filter(Boolean))
+const activeWords = computed(() => favoriteMode.value ? favoriteWords.value : libraryWords.value)
 const current = computed(() => {
   const word = activeWords.value[index.value]
   if (!word) return null
   return { ...word, meaning: customMeanings.value[word.word] ?? word.meaning }
+})
+const currentForms = computed(() => {
+  const seen = new Set()
+  return (current.value?.forms || []).filter(item => {
+    if (!item.form || item.grammar?.includes('原形')) return false
+    const key = [item.form, item.grammar, item.partOfSpeech].join('|')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 })
 const isCurrentFavorite = computed(() => current.value ? favoriteIds.value.includes(current.value.id) : false)
 const displayStyle = computed(() => ({
@@ -210,10 +355,17 @@ const displayStyle = computed(() => ({
   '--meaning-size': `${38 * textScale.value}px`,
   '--example-size': `${24 * textScale.value}px`,
   '--translation-size': `${20 * textScale.value}px`,
+  '--mobile-word-max': `${48 * textScale.value}px`,
+  '--mobile-body-size': `${16 * textScale.value}px`,
+  '--mobile-example-size': `${17 * textScale.value}px`,
 }))
 let audio
 let requestId = 0
-let loadedWordId = null
+let loadedWordKey = null
+let audioKind = null
+let speechUtterance = null
+let queuedFormWords = []
+let activeAudioWord = null
 let touchStartX = 0
 let touchStartY = 0
 let touchStartTime = 0
@@ -225,26 +377,71 @@ function stopAudio() {
   replayTimer = undefined
   requestId++
   audio?.pause()
+  if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
+  speechUtterance = null
+  queuedFormWords = []
+  activeAudioWord = null
   playing.value = false
+}
+
+function currentWordKey() {
+  return current.value ? `${selectedLibrary.value}:${current.value.id}` : ''
+}
+
+function playWithSystemVoice(request, word = current.value?.word) {
+  if (!current.value || typeof window === 'undefined' || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+    if (request === requestId) audioMessage.value = '此词暂无录音，当前浏览器也不支持系统语音。'
+    return
+  }
+  audioKind = 'speech'
+  const utterance = new SpeechSynthesisUtterance(word)
+  utterance.lang = selectedLibrary.value === 'cet4-listening-1000' ? 'en-GB' : 'en-US'
+  utterance.rate = playbackRate.value
+  utterance.onstart = () => {
+    if (request === requestId) playing.value = true
+  }
+  utterance.onend = () => {
+    if (request !== requestId) return
+    playing.value = false
+    handleAudioEnded()
+  }
+  utterance.onerror = () => {
+    if (request === requestId) {
+      playing.value = false
+      audioMessage.value = '未能播放系统语音，请点击“播放发音”重试。'
+    }
+  }
+  speechUtterance = utterance
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(utterance)
 }
 
 async function playCurrent() {
   if (!audio || !current.value) return
+  stopAudio()
   const request = ++requestId
-  audio.pause()
   playing.value = false
-  const wordId = current.value.id
-  const filename = `${String(wordId - 1).padStart(6, '0')}_en.mp3`
-  loadedWordId = wordId
-  audio.src = `${import.meta.env.BASE_URL}audio/${filename}`
+  loadedWordKey = currentWordKey()
+  activeAudioWord = current.value.word
+  queuedFormWords = selectedLibrary.value === 'cet4-listening-1000'
+    ? [...new Set(currentForms.value.map(item => item.form).filter(form => form && form.toLocaleLowerCase() !== current.value.word.toLocaleLowerCase()))]
+    : []
+  const audioId = selectedLibrary.value === 'core' ? current.value.id : current.value.audioId
+  audioMessage.value = ''
+  audioKind = audioId ? 'recording' : 'remote'
+  if (audioId) {
+    const filename = `${String(audioId - 1).padStart(6, '0')}_en.mp3`
+    audio.src = `${import.meta.env.BASE_URL}audio/${filename}`
+  } else {
+    audio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(current.value.word)}&type=2`
+  }
   audio.loop = false
   audio.playbackRate = playbackRate.value
-  audioMessage.value = ''
   try {
     await audio.play()
     if (request === requestId) playing.value = true
   } catch {
-    if (request === requestId) audioMessage.value = '未能播放录音，请点击播放重试。'
+    if (request === requestId) audioMessage.value = '自动播放受限，请点击“播放发音”手动播放。'
   }
 }
 
@@ -261,9 +458,14 @@ async function togglePause() {
     playing.value = false
     return
   }
-  if (loadedWordId !== current.value.id) {
+  if (loadedWordKey !== currentWordKey()) {
     playCount = 0
     playCurrent()
+    return
+  }
+  if (audioKind === 'speech') {
+    if (playing.value) stopAudio()
+    else playCurrent()
     return
   }
   if (!audio.paused) {
@@ -291,7 +493,26 @@ async function togglePause() {
 
 function updatePlaybackRate() {
   if (audio) audio.playbackRate = playbackRate.value
+  if (audioKind === 'speech' && playing.value) playCurrent()
   if (replayTimer) scheduleReplay()
+}
+
+function playNextFormWord() {
+  const word = queuedFormWords.shift()
+  if (!word || !audio) return false
+  const request = ++requestId
+  activeAudioWord = word
+  audioKind = 'remote'
+  audioMessage.value = ''
+  audio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=2`
+  audio.loop = false
+  audio.playbackRate = playbackRate.value
+  audio.play().then(() => {
+    if (request === requestId) playing.value = true
+  }).catch(() => {
+    if (request === requestId) audioMessage.value = '自动播放受限，请点击“播放发音”手动播放。'
+  })
+  return true
 }
 
 function replayDelay() {
@@ -308,6 +529,7 @@ function scheduleReplay() {
 }
 
 function handleAudioEnded() {
+  if (playNextFormWord()) return
   if (!dictation.value && !playMode.value) {
     playing.value = false
     return
@@ -318,7 +540,9 @@ function handleAudioEnded() {
       playCount = 0
       if (!activeWords.value.length) return
       index.value = (index.value + 1) % activeWords.value.length
-      revealed.value = false
+      saveProgress()
+      revealed.value = selectedLibrary.value === 'cet4-listening-1000'
+      resetDetailsPosition()
     }
   }
   scheduleReplay()
@@ -343,31 +567,32 @@ function jumpToTarget() {
     jumpMessage.value = numeric !== null ? `请输入 1-${activeWords.value.length} 之间的序号` : '当前列表中没有这个单词'
     return
   }
-  const resume = playing.value
   stopAudio()
   playCount = 0
   index.value = targetIndex
+  saveProgress()
   if (dictation.value) resetQuestion()
-  revealed.value = false
+  revealed.value = selectedLibrary.value === 'cet4-listening-1000' && !dictation.value
+  moreOpen.value = false
+  resetDetailsPosition()
   jumpMessage.value = ''
   favoriteMessage.value = ''
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-  if (dictation.value) {
-    playCurrent()
-    focusAnswer()
-  } else if (resume) playCurrent()
+  playCurrent()
+  if (dictation.value) focusAnswer()
 }
 
 function moveWord(step) {
   if (dictation.value) return
   if (!activeWords.value.length) return
-  const resume = playing.value
   stopAudio()
   playCount = 0
   index.value = (index.value + step + activeWords.value.length) % activeWords.value.length
-  revealed.value = false
+  saveProgress()
+  revealed.value = selectedLibrary.value === 'cet4-listening-1000'
+  resetDetailsPosition()
   favoriteMessage.value = ''
-  if (resume || playMode.value) playCurrent()
+  playCurrent()
 }
 
 function toggleFavorite() {
@@ -379,13 +604,12 @@ function toggleFavorite() {
     : [...favoriteIds.value, currentId]
 
   try {
-    localStorage.setItem(favoriteStorageKey, JSON.stringify(updated))
+    localStorage.setItem(storageKeys[selectedLibrary.value].favorites, JSON.stringify(updated))
   } catch {
     favoriteMessage.value = '浏览器未能保存收藏，请检查是否允许本地存储后重试。'
     return
   }
 
-  const resume = favoriteMode.value && (playing.value || playMode.value)
   if (favoriteMode.value && removing) stopAudio()
   favoriteIds.value = updated
   favoriteMessage.value = ''
@@ -393,14 +617,14 @@ function toggleFavorite() {
   if (favoriteMode.value && removing) {
     index.value = Math.min(index.value, favoriteWords.value.length - 1)
     if (index.value < 0) index.value = 0
-    revealed.value = false
+    revealed.value = selectedLibrary.value === 'cet4-listening-1000'
     if (!favoriteWords.value.length) playMode.value = false
-    else if (resume) playCurrent()
+    else playCurrent()
   }
 }
 
 function handleTouchStart(event) {
-  if (dictation.value || event.target.closest('input, button, select, .details')) {
+  if (dictation.value || event.target.closest('input, button, select, textarea, summary, details, [contenteditable="true"]')) {
     touchEnabled = false
     return
   }
@@ -418,9 +642,9 @@ function handleTouchEnd(event) {
   const deltaX = touch.clientX - touchStartX
   const deltaY = touch.clientY - touchStartY
   const elapsed = Date.now() - touchStartTime
-  if (elapsed > 800 || Math.abs(deltaY) < 48 || Math.abs(deltaY) < Math.abs(deltaX) * 1.2) return
+  if (elapsed > 800 || Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
   ignoreClicksUntil = Date.now() + 400
-  moveWord(deltaY < 0 ? 1 : -1)
+  moveWord(deltaX < 0 ? 1 : -1)
 }
 
 function handlePageClick(event) {
@@ -475,7 +699,7 @@ function onKeyup(event) {
   if (event.target.closest('input, textarea')) return
   if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
     event.preventDefault()
-    revealed.value = !revealed.value
+    toggleReveal()
     return
   }
   if (event.target.closest('button, select')) return
@@ -490,11 +714,17 @@ onMounted(() => {
   audio.preload = 'auto'
   audio.addEventListener('error', () => {
     playing.value = false
-    audioMessage.value = '录音加载失败，请联网后重试。'
+    if (audioKind === 'remote' && loadedWordKey === currentWordKey()) {
+      const request = ++requestId
+      playWithSystemVoice(request, activeAudioWord || current.value.word)
+      return
+    }
+    audioMessage.value = '录音加载失败，请点击“播放发音”重试。'
   })
   audio.addEventListener('ended', handleAudioEnded)
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('keyup', onKeyup)
+  playCurrent()
 })
 
 onBeforeUnmount(() => {
@@ -505,7 +735,7 @@ onBeforeUnmount(() => {
   if (audio) {
     audio.removeAttribute('src')
     audio.load()
-    loadedWordId = null
+    loadedWordKey = null
     audio = undefined
   }
 })
@@ -520,60 +750,93 @@ onBeforeUnmount(() => {
     @touchend.passive="handleTouchEnd"
     @click="handlePageClick"
   >
-    <h1
-      v-if="!dictation && current"
-      class="word-content"
-      @click="handleWordClick"
-      :title="playing ? '暂停播放' : '播放录音'"
-    >{{ current.word }}</h1>
     <header class="top-toolbar">
-    <form class="jump-form" @submit.prevent="jumpToTarget">
-      <label for="jump-query">跳转到</label>
-      <input id="jump-query" v-model="jumpQuery" type="text" inputmode="text" placeholder="输入序号或单词" autocomplete="off" :disabled="!current" />
-      <button type="submit" :disabled="!current">跳转</button>
-      <button type="button" class="mode-toggle" :disabled="dictation || !current" :aria-pressed="playMode" @click="togglePlayMode">
-        {{ playMode ? '停止播放模式' : '播放模式' }}
-      </button>
+      <div class="toolbar-primary">
+        <label class="library-control" for="library-select">
+          <span>词库</span>
+          <select id="library-select" :value="selectedLibrary" @change="changeLibrary($event.target.value)">
+            <option v-for="library in libraryOptions" :key="library.id" :value="library.id">{{ library.label }}</option>
+          </select>
+        </label>
+        <button type="button" class="more-toggle" :aria-expanded="moreOpen" aria-controls="more-panel" @click="moreOpen = !moreOpen">
+          {{ moreOpen ? '收起' : '更多' }}
+        </button>
+      </div>
       <div class="study-mode" role="group" aria-label="学习模式">
         <button type="button" :aria-pressed="!dictation && !favoriteMode" @click="switchMode('study')">学习模式</button>
         <button type="button" :aria-pressed="dictation" @click="switchMode('dictation')">听音写义</button>
         <button type="button" :aria-pressed="favoriteMode" @click="switchMode('favorites')">收藏模式</button>
       </div>
-      <p v-if="jumpMessage" class="jump-message" role="status">{{ jumpMessage }}</p>
-    </form>
-    <div class="word-meta">
-      <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }" :disabled="!current"
-        :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
-        <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
-        {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
-      </button>
-      <span class="word-number">{{ current ? index + 1 : 0 }} / {{ activeWords.length }}</span>
-      <label class="speed-control">
-        <span>速度/间隔</span>
-        <select v-model.number="playbackRate" @change="updatePlaybackRate" aria-label="播放速度和间隔">
-          <option v-for="speed in speedOptions" :key="speed" :value="speed">{{ speed }}×</option>
-        </select>
-      </label>
-      <label class="size-control">
-        <span>大小</span>
-        <select v-model.number="textScale" aria-label="文字大小">
-          <option v-for="scale in textScaleOptions" :key="scale" :value="scale">{{ scale }}×</option>
-        </select>
-      </label>
-    </div>
+      <form id="more-panel" class="more-panel" :class="{ 'is-open': moreOpen }" @submit.prevent="jumpToTarget">
+        <div class="jump-control">
+          <label for="jump-query">单词跳转</label>
+          <div>
+            <input id="jump-query" v-model="jumpQuery" type="text" inputmode="text" placeholder="输入序号或单词" autocomplete="off" :disabled="!current" />
+            <button type="submit" :disabled="!current">跳转</button>
+          </div>
+        </div>
+        <button type="button" class="mode-toggle" :disabled="dictation || !current" :aria-pressed="playMode" @click="togglePlayMode">
+          {{ playMode ? '停止播放模式' : '开启播放模式' }}
+        </button>
+        <label class="speed-control">
+          <span>播放速度与间隔</span>
+          <select v-model.number="playbackRate" @change="updatePlaybackRate" aria-label="播放速度和间隔">
+            <option v-for="speed in speedOptions" :key="speed" :value="speed">{{ speed }}×</option>
+          </select>
+        </label>
+        <label class="size-control">
+          <span>文字大小</span>
+          <select v-model.number="textScale" aria-label="文字大小">
+            <option v-for="scale in textScaleOptions" :key="scale" :value="scale">{{ scale }}×</option>
+          </select>
+        </label>
+        <p v-if="jumpMessage" class="jump-message" role="status">{{ jumpMessage }}</p>
+      </form>
     </header>
+    <section v-if="!dictation && current" class="word-stage">
+      <h1 class="word-content" @click="handleWordClick" :title="playing ? '暂停播放' : '播放录音'">{{ current.word }}</h1>
+      <p v-if="current.formOf" class="word-origin-note" :class="{ 'listening-word-origin-note': selectedLibrary === 'cet4-listening-1000' }">词性变化：{{ current.formOf }} 的 {{ current.formGrammar }}</p>
+      <div v-if="currentForms.length" class="word-forms" :class="{ 'listening-word-forms': selectedLibrary === 'cet4-listening-1000' }" aria-label="词形变化">
+        <span class="word-forms-title">词形变化</span>
+        <span v-for="(item, itemIndex) in currentForms" :key="`${item.form}-${item.partOfSpeech}-${item.grammar}-${itemIndex}`"
+          class="word-form-chip">
+          <strong>{{ item.form }}</strong>
+          <span>{{ [item.grammar, item.partOfSpeech].filter(Boolean).join(' · ') }}</span>
+        </span>
+      </div>
+      <div class="word-meta">
+        <button type="button" class="audio-toggle" :aria-pressed="playing" @click="togglePause">
+          {{ playing ? '暂停发音' : '播放发音' }}
+        </button>
+        <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }"
+          :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
+          <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
+          {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
+        </button>
+        <span class="word-number">{{ index + 1 }} / {{ activeWords.length }}</span>
+      </div>
+    </section>
+    <div v-else-if="dictation && current" class="word-meta dictation-meta">
+      <button type="button" class="audio-toggle" :aria-pressed="playing" @click="togglePause">{{ playing ? '暂停发音' : '播放发音' }}</button>
+      <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }" :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
+        <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>{{ isCurrentFavorite ? '取消收藏' : '收藏' }}
+      </button>
+      <span class="word-number">{{ index + 1 }} / {{ activeWords.length }}</span>
+    </div>
+    <p v-if="audioMessage" class="audio-message" role="status">{{ audioMessage }}</p>
     <p v-if="favoriteMessage" class="favorite-message" role="status">{{ favoriteMessage }}</p>
     <section v-if="favoriteMode && !current" class="empty-favorites" aria-live="polite">
       <h1>暂无收藏单词</h1>
       <p>切换到学习模式，在顶部点击“收藏”添加单词。</p>
     </section>
-    <button v-if="!dictation && current" class="reveal-button" @click="revealed = !revealed">
+    <button v-if="!dictation && current" class="reveal-button" @click="toggleReveal">
       {{ revealed ? '隐藏释义与例句' : '显示中文释义与例句' }}
     </button>
     <section v-if="dictation && current" class="dictation-panel">
       <div class="answer-context">
         <div class="quiz-prompt">
           <h1 class="word-content" @click="handleWordClick" :title="playing ? '暂停播放' : '播放录音'">{{ current.word }}</h1>
+          <p v-if="current.formOf" class="word-origin-note" :class="{ 'listening-word-origin-note': selectedLibrary === 'cet4-listening-1000' }">词性变化：{{ current.formOf }} 的 {{ current.formGrammar }}</p>
         </div>
         <div class="answer-entry">
           <label for="meaning-answer">中文释义</label>
@@ -586,7 +849,6 @@ onBeforeUnmount(() => {
       <div class="dictation-actions">
         <button type="button" :aria-pressed="playing" @click="togglePause">{{ playing ? '暂停' : '播放' }}</button>
       </div>
-      <p v-if="audioMessage" role="status">{{ audioMessage }}</p>
       <form id="dictation-answer-form" class="answer-form" @submit.prevent="checkAnswer">
         <p class="answer-feedback" :class="{ correct: answerState === 'correct' }" role="status">{{ answerMessage }}</p>
         <div class="dictation-actions">
@@ -609,25 +871,11 @@ onBeforeUnmount(() => {
         </div>
       </form>
       <div v-if="['correct', 'shown'].includes(answerState)" class="quiz-answer">
-        <p class="meaning">{{ current.meaning }}</p>
-        <div class="examples">
-          <div v-if="current.example" class="example"><p>{{ current.example }}</p><p>{{ current.translation }}</p></div>
-          <div v-if="current.example2" class="example"><p>{{ current.example2 }}</p><p>{{ current.translation2 }}</p></div>
-        </div>
+        <WordDetails :key="`${selectedLibrary}:${current.id}:quiz`" :word="current" />
       </div>
     </section>
-    <section v-if="!dictation && current && revealed" class="details" aria-live="polite">
-      <p class="meaning">{{ current.meaning }}</p>
-      <div class="examples">
-        <div v-if="current.example" class="example">
-          <p>{{ current.example }}</p>
-          <p>{{ current.translation }}</p>
-        </div>
-        <div v-if="current.example2" class="example">
-          <p>{{ current.example2 }}</p>
-          <p>{{ current.translation2 }}</p>
-        </div>
-      </div>
+    <section v-if="!dictation && current && revealed" ref="detailsPanel" class="details" aria-live="polite">
+      <WordDetails :key="`${selectedLibrary}:${current.id}:study`" :word="current" />
     </section>
   </main>
 </template>
