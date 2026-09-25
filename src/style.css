@@ -534,8 +534,9 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
 .listening-meaning-list { display: grid; gap: 8px; }
 .listening-meaning-list .meaning { margin: 0; color: #304f66; text-align: center; }
 .sense-card .sense-meaning { margin-top: 8px; color: #29485e; }
-.word-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
-.word-summary span { color: #1f648d; font-size: .85em; }
+.word-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px 18px; text-align: center; line-height: 1.45; }
+.word-summary-group { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px; }
+.word-summary .word-summary-pos { color: #1f648d; font-size: .85em; }
 .sense-phrase { color: #42657c; }
 .part-of-speech { color: #1f648d; }
 .frequency-note { color: #657f91; }

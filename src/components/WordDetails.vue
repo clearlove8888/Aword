@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { summarizeWord } from '../word-summary.js'
 
 const props = defineProps({
   word: { type: Object, required: true },
@@ -11,18 +12,7 @@ watch(() => props.word.id, () => { expandedSenses.value = new Set() })
 const isFrequencyWord = computed(() => Array.isArray(props.word.meanings))
 const isListeningWord = computed(() => props.word.source === '四级听力高频词_词性释义.xlsx')
 
-const summary = computed(() => {
-  const source = props.word.analysis?.length ? props.word.analysis : props.word.meanings || []
-  const primary = source.reduce((best, item) => !best || (item.count || 0) > (best.count || 0) ? item : best, null)
-  const rawMeaning = primary?.meaning || props.word.meaning || ''
-  const partOfSpeech = primary?.partOfSpeech || rawMeaning.match(/^([A-Za-z./]+)\s+/)?.[1] || ''
-  const meaning = rawMeaning
-    .replace(/^[A-Za-z./]+\s+/, '')
-    .replace(/^[（(][^()（）]*[）)]\s*/, '')
-    .replace(/[（(][^()（）]*[）)]/g, '')
-    .split(/[；;，,|]/)[0].trim()
-  return { partOfSpeech, meaning: meaning || rawMeaning }
-})
+const summary = computed(() => summarizeWord(props.word))
 
 function isUsableCollocationExample(text) {
   const value = text.trim()
@@ -137,7 +127,12 @@ function toggleSenseExamples(index) {
     </section>
 
     <section v-else class="detail-section summary-section">
-      <h2 class="word-summary"><span v-if="summary.partOfSpeech">{{ summary.partOfSpeech }}</span>{{ summary.meaning }}</h2>
+      <h2 class="word-summary">
+        <span v-for="(group, groupIndex) in summary.groups" :key="`${group.partOfSpeech}-${groupIndex}`" class="word-summary-group">
+          <span v-if="group.partOfSpeech" class="word-summary-pos">{{ group.partOfSpeech }}</span>
+          <span>{{ group.meanings.join('；') }}</span>
+        </span>
+      </h2>
       <div class="detail-list sense-list">
         <article v-for="(item, itemIndex) in senses" :key="`${item.partOfSpeech}-${itemIndex}`" class="detail-card sense-card">
           <div class="detail-card-heading">
