@@ -2,7 +2,8 @@ function shortMeaning(rawMeaning = '') {
   const withoutPartOfSpeech = rawMeaning.replace(/^[A-Za-z./]+\s+/, '')
   const concise = withoutPartOfSpeech
     .replace(/^[（(][^()（）]*[）)]\s*/, '')
-    .replace(/[（(][^()（）]*[）)]/g, '')
+    // Keep short objects such as 交（朋友）; omit lengthy usage notes.
+    .replace(/[（(]([^()（）]*)[）)]/g, (_, note) => /^[㐀-鿿]{1,4}$/.test(note) ? '（' + note + '）' : '')
     .split(/[；;，,|]/)[0]
     .trim()
   return concise || withoutPartOfSpeech.trim()
@@ -17,13 +18,18 @@ export function summarizeWord(word) {
   const selected = []
   let covered = 0
 
+  // Rank by recorded sense frequency; retain enough senses to reach 90%.
   for (const item of ranked) {
-    if (selected.length && covered >= total * 0.8) break
+    if (selected.length && covered >= total * 0.9) break
+    // Unclassified occurrences do not establish coverage of a usable meaning.
+    if (!item.meaning?.trim() || /无法可靠判断|需人工确认/.test(item.meaning)) continue
     selected.push(item)
     covered += item.count
   }
 
-  if (!selected.length) selected.push({ meaning: word.meaning || '', partOfSpeech: '' })
+  if (!selected.length) {
+    selected.push({ meaning: source.length ? '义项待核对' : word.meaning || '', partOfSpeech: '' })
+  }
 
   const groups = []
   for (const item of selected) {
@@ -38,5 +44,5 @@ export function summarizeWord(word) {
     if (meaning && !group.meanings.includes(meaning)) group.meanings.push(meaning)
   }
 
-  return { groups, covered, total }
+  return { groups, covered, total, meetsCoverage: total > 0 && covered >= total * 0.9 }
 }

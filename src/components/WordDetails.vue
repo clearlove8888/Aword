@@ -133,6 +133,12 @@ function toggleSenseExamples(index) {
           <span>{{ group.meanings.join('；') }}</span>
         </span>
       </h2>
+      <p v-if="summary.total > 0 && !summary.meetsCoverage" class="word-summary-note">
+        已确认义项覆盖 {{ Math.floor(summary.covered / summary.total * 1000) / 10 }}%，其余语料待核对，暂未达到 90%。
+      </p>
+      <p v-else-if="isFrequencyWord && summary.total === 0" class="word-summary-note">
+        暂无语料记录，无法计算覆盖率。
+      </p>
       <div class="detail-list sense-list">
         <article v-for="(item, itemIndex) in senses" :key="`${item.partOfSpeech}-${itemIndex}`" class="detail-card sense-card">
           <div class="detail-card-heading">

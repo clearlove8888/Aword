@@ -577,6 +577,7 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
 .word-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px 18px; text-align: center; line-height: 1.45; }
 .word-summary-group { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px; }
 .word-summary .word-summary-pos { color: #1f648d; font-size: .85em; }
+.word-summary-note { margin: 0 0 12px; color: #657f91; font-size: 14px; line-height: 1.5; text-align: center; }
 .sense-phrase { color: #42657c; }
 .part-of-speech { color: #1f648d; }
 .frequency-note { color: #657f91; }
