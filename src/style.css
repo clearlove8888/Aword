@@ -472,6 +472,7 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
 .more-panel button { padding: 9px 14px; color: #167bb9; cursor: pointer; }
 .more-panel .mode-toggle[aria-pressed="true"] { background: #e3f4ff; border-color: #63b9ec; }
 .more-panel .speed-control,
+.more-panel .repeat-control,
 .more-panel .size-control { display: grid; gap: 4px; }
 .more-panel select { padding: 7px 30px 7px 10px; color: #167bb9; cursor: pointer; }
 .more-panel .jump-message { flex-basis: 100%; }
@@ -492,28 +493,29 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   width: min(100%, 900px);
-  margin: 12px auto 0;
+  margin: 14px auto 0;
   color: #526f82;
-  font-size: 13px;
+  font-size: 15px;
 }
 .word-forms-title {
   color: #315a75;
+  font-size: 16px;
   font-weight: 650;
 }
 .word-form-chip {
   display: inline-flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 5px 9px;
+  gap: 6px;
+  padding: 7px 11px;
   border: 1px solid #d4e9f5;
   border-radius: 999px;
   background: #f8fcff;
-  line-height: 1.35;
+  line-height: 1.45;
 }
-.word-form-chip strong { color: #1f648d; font-size: 14px; }
-.word-form-chip span { color: #657f91; }
+.word-form-chip strong { color: #1f648d; font-size: 17px; }
+.word-form-chip span { min-width: 0; color: #657f91; overflow-wrap: anywhere; }
 .listening-word-forms { gap: 10px; margin-top: 16px; font-size: 19px; }
 .listening-word-forms .word-forms-title { color: #24445e; font-size: 19px; }
 .listening-word-forms .word-form-chip { gap: 8px; padding: 8px 12px; border-radius: 8px; }
@@ -529,6 +531,44 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
   flex-wrap: wrap;
 }
 .study-meta { margin-top: 14px; }
+.word-page.has-study-actions { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
+.study-bottom-actions {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: max(32px, calc(env(safe-area-inset-bottom) + 20px));
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(calc(100% - 48px), 360px);
+  padding: 8px;
+  border: 1px solid #d4e9f5;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 8px 28px rgba(42, 102, 137, .14);
+}
+.study-bottom-actions .study-meta {
+  position: static;
+  order: initial;
+  width: 100%;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.study-bottom-actions .reveal-button {
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-shadow: none;
+}
 .word-details { color: #304f66; }
 .listening-summary-section { display: grid; text-align: center; }
 .listening-meaning-list { display: grid; gap: 8px; }
@@ -708,9 +748,12 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
   .jump-control input { width: 100%; }
   .more-panel .mode-toggle { grid-column: 1 / -1; width: 100%; max-width: none; white-space: nowrap; }
   .more-panel .speed-control,
+  .more-panel .repeat-control,
   .more-panel .size-control { display: grid; align-content: end; min-width: 0; }
   .more-panel .speed-control span,
+  .more-panel .repeat-control span,
   .more-panel .size-control span { font-size: 13px; }
+  .more-panel .repeat-control { grid-column: 1 / -1; }
   .more-panel select { width: 100%; min-width: 0; }
   .more-panel .jump-message { grid-column: 1 / -1; }
   .word-stage { margin-top: 2px; }
@@ -723,17 +766,18 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
     overflow: visible;
   }
   .word-forms {
-    gap: 6px;
-    margin-top: 10px;
-    font-size: 12px;
+    gap: 7px;
+    margin-top: 12px;
+    font-size: 14px;
   }
-  .word-forms-title { flex-basis: 100%; text-align: center; }
+  .word-forms-title { flex-basis: 100%; font-size: 16px; text-align: center; }
   .word-form-chip {
-    gap: 4px;
+    gap: 5px;
     max-width: 100%;
-    padding: 5px 8px;
+    padding: 6px 10px;
   }
-  .word-form-chip strong { font-size: 13px; }
+  .word-form-chip strong { font-size: 16px; }
+  .word-form-chip span { font-size: 14px; }
   .listening-word-forms { gap: 7px; margin-top: 12px; font-size: 16px; }
   .listening-word-forms .word-forms-title { flex: 0 0 auto; font-size: 16px; }
   .listening-word-forms .word-form-chip { gap: 5px; padding: 6px 8px; }
@@ -755,6 +799,12 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
     font-size: 13px;
   }
   .study-meta { margin: 8px 0 0; }
+  .word-page.has-study-actions { padding-bottom: calc(156px + env(safe-area-inset-bottom)); }
+  .study-bottom-actions {
+    position: fixed;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: min(calc(100% - 32px), 360px);
+  }
   .word-meta .audio-toggle,
   .word-meta .favorite-toggle {
     min-height: 44px;

@@ -309,6 +309,17 @@ const revealed = ref(selectedLibrary.value === 'cet4-listening-1000')
 const playMode = ref(false)
 const playbackRate = ref(1)
 const speedOptions = [0.75, 1, 1.25, 1.5, 2]
+const repeatCountOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+const repeatCountStorageKey = 'aword-playback-repeat-count-v1'
+function readRepeatCount() {
+  try {
+    const saved = Number(localStorage.getItem(repeatCountStorageKey))
+    return repeatCountOptions.includes(saved) ? saved : 5
+  } catch {
+    return 5
+  }
+}
+const repeatCount = ref(readRepeatCount())
 const baseReplayDelay = 400
 const textScale = ref(1)
 const textScaleOptions = [0.75, 1, 1.25, 1.5]
@@ -503,6 +514,12 @@ function updatePlaybackRate() {
   if (replayTimer) scheduleReplay()
 }
 
+function updateRepeatCount() {
+  if (!repeatCountOptions.includes(repeatCount.value)) repeatCount.value = 5
+  playCount = 0
+  try { localStorage.setItem(repeatCountStorageKey, String(repeatCount.value)) } catch { /* Keep the setting usable for this session. */ }
+}
+
 function playNextFormWord() {
   const word = queuedFormWords.shift()
   if (!word || !audio) return false
@@ -542,7 +559,7 @@ function handleAudioEnded() {
   }
   if (playMode.value) {
     playCount += 1
-    if (playCount >= 5) {
+    if (playCount >= repeatCount.value) {
       playCount = 0
       if (!activeWords.value.length) return
       index.value = (index.value + 1) % activeWords.value.length
@@ -749,7 +766,7 @@ onBeforeUnmount(() => {
 <template>
   <main
     class="word-page has-toolbar"
-    :class="{ 'dictation-page': dictation }"
+    :class="{ 'has-study-actions': !dictation && current, 'dictation-page': dictation }"
     aria-label="单词学习"
     :style="displayStyle"
     @touchstart.passive="handleTouchStart"
@@ -796,6 +813,12 @@ onBeforeUnmount(() => {
             <option v-for="scale in textScaleOptions" :key="scale" :value="scale">{{ scale }}×</option>
           </select>
         </label>
+        <label class="repeat-control">
+          <span>每词播放次数</span>
+          <select v-model.number="repeatCount" @change="updateRepeatCount" aria-label="每词播放次数">
+            <option v-for="count in repeatCountOptions" :key="count" :value="count">{{ count }} 次</option>
+          </select>
+        </label>
         <p v-if="jumpMessage" class="jump-message" role="status">{{ jumpMessage }}</p>
       </form>
     </header>
@@ -811,16 +834,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </section>
-    <div v-if="!dictation && current" class="word-meta study-meta">
-      <button type="button" class="audio-toggle" @click="replayWord">播放单词</button>
-      <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }"
-        :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
-        <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
-        {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
-      </button>
-      <span class="word-number">{{ index + 1 }} / {{ activeWords.length }}</span>
-    </div>
-    <div v-else-if="dictation && current" class="word-meta dictation-meta">
+    <div v-if="dictation && current" class="word-meta dictation-meta">
       <button type="button" class="audio-toggle" :aria-pressed="playing" @click="togglePause">{{ playing ? '暂停发音' : '播放发音' }}</button>
       <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }" :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
         <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>{{ isCurrentFavorite ? '取消收藏' : '收藏' }}
@@ -833,9 +847,20 @@ onBeforeUnmount(() => {
       <h1>暂无收藏单词</h1>
       <p>切换到学习模式，在顶部点击“收藏”添加单词。</p>
     </section>
-    <button v-if="!dictation && current" class="reveal-button" @click="toggleReveal">
-      {{ revealed ? '隐藏释义与例句' : '显示中文释义与例句' }}
-    </button>
+    <div v-if="!dictation && current" class="study-bottom-actions">
+      <div class="word-meta study-meta">
+        <button type="button" class="audio-toggle" @click="replayWord">播放单词</button>
+        <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }"
+          :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
+          <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
+          {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
+        </button>
+        <span class="word-number">{{ index + 1 }} / {{ activeWords.length }}</span>
+      </div>
+      <button type="button" class="reveal-button" @click="toggleReveal">
+        {{ revealed ? '隐藏释义与例句' : '显示中文释义与例句' }}
+      </button>
+    </div>
     <section v-if="dictation && current" class="dictation-panel">
       <div class="answer-context">
         <div class="quiz-prompt">

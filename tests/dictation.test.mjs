@@ -61,11 +61,12 @@ function createSession(storage = new Map(), failSave = false) {
   })
   vm.runInContext(source + `\nglobalThis.session = {
     dictation, answer, answerState, answerMessage, revealed, current, index, composing, audioMessage,
-    reviewWords, playMode, toggleDictation, checkAnswer, showAnswer, acceptMyAnswer,
+    reviewWords, playMode, togglePlayMode, toggleDictation, checkAnswer, showAnswer, acceptMyAnswer,
     nextQuestion, moveWord, handlePageClick, handleTouchStart, handleTouchEnd, handleAudioEnded, onKeyup, onKeydown,
     jumpToTarget, jumpQuery, jumpMessage,
     editingMeaning, meaningDraft, meaningError, saveMeaning,
     togglePause, replayWord, playing, playbackRate, updatePlaybackRate, replayDelay,
+    repeatCount, updateRepeatCount,
     favoriteMode, favoriteIds, favoriteWords, activeWords, favoriteMessage,
     isCurrentFavorite, switchMode, toggleFavorite,
     selectedLibrary, libraryWords, changeLibrary, saveProgress,
@@ -537,6 +538,29 @@ test('listening library contains 1000 words with separate sense rows and request
   assert.equal(s.current.value.formOf, 'parent')
   assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=parents&type=2')
   s.dispose()
+})
+
+test('playback mode advances after the selected number of plays and restores that setting', async () => {
+  const storage = new Map()
+  const s = createSession(storage)
+  assert.equal(s.repeatCount.value, 5)
+  s.repeatCount.value = 2
+  s.updateRepeatCount()
+  assert.equal(storage.get('aword-playback-repeat-count-v1'), '2')
+
+  s.togglePlayMode()
+  s.handleAudioEnded()
+  assert.equal(s.index.value, 0)
+  ;[...s.timers.values()][0]()
+  await Promise.resolve()
+  s.handleAudioEnded()
+  assert.equal(s.index.value, 1)
+  assert.equal(storage.get('aword-progress-core-v1'), '1')
+  s.dispose()
+
+  const restored = createSession(storage)
+  assert.equal(restored.repeatCount.value, 2)
+  restored.dispose()
 })
 
 test('playing a listening word also reads its listed forms in sequence', async () => {
