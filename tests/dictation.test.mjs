@@ -65,7 +65,7 @@ function createSession(storage = new Map(), failSave = false) {
     nextQuestion, moveWord, handlePageClick, handleTouchStart, handleTouchEnd, handleAudioEnded, onKeyup, onKeydown,
     jumpToTarget, jumpQuery, jumpMessage,
     editingMeaning, meaningDraft, meaningError, saveMeaning,
-    togglePause, playing, playbackRate, updatePlaybackRate, replayDelay,
+    togglePause, replayWord, playing, playbackRate, updatePlaybackRate, replayDelay,
     favoriteMode, favoriteIds, favoriteWords, activeWords, favoriteMessage,
     isCurrentFavorite, switchMode, toggleFavorite,
     selectedLibrary, libraryWords, changeLibrary, saveProgress,
@@ -549,6 +549,21 @@ test('playing a listening word also reads its listed forms in sequence', async (
   assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=further&type=2')
   await Promise.resolve()
   assert.equal(s.playing.value, true)
+  s.dispose()
+})
+
+test('manual playback repeats only the displayed word, even in the listening library', async () => {
+  const s = createSession()
+  s.changeLibrary('cet4-listening-1000')
+  s.jumpQuery.value = 'far'
+  s.jumpToTarget()
+  const previousPlays = s.audio.plays.length
+  s.replayWord()
+  await Promise.resolve()
+  assert.equal(s.audio.plays.length, previousPlays + 1)
+  assert.equal(s.audio.src, 'https://dict.youdao.com/dictvoice?audio=far&type=2')
+  s.handleAudioEnded()
+  assert.equal(s.audio.plays.length, previousPlays + 1)
   s.dispose()
 })
 

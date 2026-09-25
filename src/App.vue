@@ -408,7 +408,7 @@ function playWithSystemVoice(request, word = current.value?.word) {
   utterance.onerror = () => {
     if (request === requestId) {
       playing.value = false
-      audioMessage.value = '未能播放系统语音，请点击“播放发音”重试。'
+      audioMessage.value = '未能播放系统语音，请点击“播放单词”重试。'
     }
   }
   speechUtterance = utterance
@@ -416,14 +416,14 @@ function playWithSystemVoice(request, word = current.value?.word) {
   window.speechSynthesis.speak(utterance)
 }
 
-async function playCurrent() {
+async function playCurrent({ wordOnly = false } = {}) {
   if (!audio || !current.value) return
   stopAudio()
   const request = ++requestId
   playing.value = false
   loadedWordKey = currentWordKey()
   activeAudioWord = current.value.word
-  queuedFormWords = selectedLibrary.value === 'cet4-listening-1000'
+  queuedFormWords = !wordOnly && selectedLibrary.value === 'cet4-listening-1000'
     ? [...new Set(currentForms.value.map(item => item.form).filter(form => form && form.toLocaleLowerCase() !== current.value.word.toLocaleLowerCase()))]
     : []
   const audioId = selectedLibrary.value === 'core' ? current.value.id : current.value.audioId
@@ -441,13 +441,19 @@ async function playCurrent() {
     await audio.play()
     if (request === requestId) playing.value = true
   } catch {
-    if (request === requestId) audioMessage.value = '自动播放受限，请点击“播放发音”手动播放。'
+    if (request === requestId) audioMessage.value = '自动播放受限，请点击“播放单词”手动播放。'
   }
 }
 
 function handleWordClick() {
   if (Date.now() < ignoreClicksUntil) return
-  togglePause()
+  replayWord()
+}
+
+function replayWord() {
+  if (!audio || !current.value) return
+  playCount = 0
+  playCurrent({ wordOnly: true })
 }
 
 async function togglePause() {
@@ -510,7 +516,7 @@ function playNextFormWord() {
   audio.play().then(() => {
     if (request === requestId) playing.value = true
   }).catch(() => {
-    if (request === requestId) audioMessage.value = '自动播放受限，请点击“播放发音”手动播放。'
+    if (request === requestId) audioMessage.value = '自动播放受限，请点击“播放单词”手动播放。'
   })
   return true
 }
@@ -719,7 +725,7 @@ onMounted(() => {
       playWithSystemVoice(request, activeAudioWord || current.value.word)
       return
     }
-    audioMessage.value = '录音加载失败，请点击“播放发音”重试。'
+    audioMessage.value = '录音加载失败，请点击“播放单词”重试。'
   })
   audio.addEventListener('ended', handleAudioEnded)
   window.addEventListener('keydown', onKeydown)
@@ -794,7 +800,7 @@ onBeforeUnmount(() => {
       </form>
     </header>
     <section v-if="!dictation && current" class="word-stage">
-      <h1 class="word-content" @click="handleWordClick" :title="playing ? '暂停播放' : '播放录音'">{{ current.word }}</h1>
+      <h1 class="word-content" @click="handleWordClick" title="播放单词">{{ current.word }}</h1>
       <p v-if="current.formOf" class="word-origin-note" :class="{ 'listening-word-origin-note': selectedLibrary === 'cet4-listening-1000' }">词性变化：{{ current.formOf }} 的 {{ current.formGrammar }}</p>
       <div v-if="currentForms.length" class="word-forms" :class="{ 'listening-word-forms': selectedLibrary === 'cet4-listening-1000' }" aria-label="词形变化">
         <span class="word-forms-title">词形变化</span>
@@ -804,18 +810,16 @@ onBeforeUnmount(() => {
           <span>{{ [item.grammar, item.partOfSpeech].filter(Boolean).join(' · ') }}</span>
         </span>
       </div>
-      <div class="word-meta">
-        <button type="button" class="audio-toggle" :aria-pressed="playing" @click="togglePause">
-          {{ playing ? '暂停发音' : '播放发音' }}
-        </button>
-        <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }"
-          :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
-          <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
-          {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
-        </button>
-        <span class="word-number">{{ index + 1 }} / {{ activeWords.length }}</span>
-      </div>
     </section>
+    <div v-if="!dictation && current" class="word-meta study-meta">
+      <button type="button" class="audio-toggle" @click="replayWord">播放单词</button>
+      <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }"
+        :aria-pressed="isCurrentFavorite" @click="toggleFavorite">
+        <span aria-hidden="true">{{ isCurrentFavorite ? '★' : '☆' }}</span>
+        {{ isCurrentFavorite ? '取消收藏' : '收藏' }}
+      </button>
+      <span class="word-number">{{ index + 1 }} / {{ activeWords.length }}</span>
+    </div>
     <div v-else-if="dictation && current" class="word-meta dictation-meta">
       <button type="button" class="audio-toggle" :aria-pressed="playing" @click="togglePause">{{ playing ? '暂停发音' : '播放发音' }}</button>
       <button type="button" class="favorite-toggle" :class="{ active: isCurrentFavorite }" :aria-pressed="isCurrentFavorite" @click="toggleFavorite">

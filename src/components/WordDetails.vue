@@ -11,6 +11,19 @@ watch(() => props.word.id, () => { expandedSenses.value = new Set() })
 const isFrequencyWord = computed(() => Array.isArray(props.word.meanings))
 const isListeningWord = computed(() => props.word.source === '四级听力高频词_词性释义.xlsx')
 
+const summary = computed(() => {
+  const source = props.word.analysis?.length ? props.word.analysis : props.word.meanings || []
+  const primary = source.reduce((best, item) => !best || (item.count || 0) > (best.count || 0) ? item : best, null)
+  const rawMeaning = primary?.meaning || props.word.meaning || ''
+  const partOfSpeech = primary?.partOfSpeech || rawMeaning.match(/^([A-Za-z./]+)\s+/)?.[1] || ''
+  const meaning = rawMeaning
+    .replace(/^[A-Za-z./]+\s+/, '')
+    .replace(/^[（(][^()（）]*[）)]\s*/, '')
+    .replace(/[（(][^()（）]*[）)]/g, '')
+    .split(/[；;，,|]/)[0].trim()
+  return { partOfSpeech, meaning: meaning || rawMeaning }
+})
+
 function isUsableCollocationExample(text) {
   const value = text.trim()
   const words = value.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []
@@ -85,12 +98,21 @@ const senses = computed(() => {
     addExample(item.example)
     const matchingMeaning = (props.word.meanings || []).find(meaning => meaning.partOfSpeech === item.partOfSpeech)
     for (const example of item.examples || matchingMeaning?.examples || []) addExample(example.text, example.translation)
+    const sourceExample = item.example || item.examples?.[0]?.text
+    const collocation = sourceExample && (props.word.collocations || []).find(entry => {
+      const phraseMeaning = entry.meaning?.split(/[；;，,（(]/)[0].replace(/[…·]/g, '').trim()
+      return entry.phrase && phraseMeaning?.length >= 2 &&
+        item.meaning?.includes(phraseMeaning) &&
+        entry.example?.trim() === sourceExample.trim() &&
+        !item.meaning.toLocaleLowerCase().includes(entry.phrase.toLocaleLowerCase())
+    })
     return {
       partOfSpeech: item.partOfSpeech,
       meaning: item.meaning,
       count: item.count,
       percentage: item.percentage,
       note: item.note || '',
+      phrase: collocation?.phrase || '',
       examples,
     }
   })
@@ -115,7 +137,7 @@ function toggleSenseExamples(index) {
     </section>
 
     <section v-else class="detail-section summary-section">
-      <h2>词性与释义</h2>
+      <h2 class="word-summary"><span v-if="summary.partOfSpeech">{{ summary.partOfSpeech }}</span>{{ summary.meaning }}</h2>
       <div class="detail-list sense-list">
         <article v-for="(item, itemIndex) in senses" :key="`${item.partOfSpeech}-${itemIndex}`" class="detail-card sense-card">
           <div class="detail-card-heading">
@@ -124,7 +146,7 @@ function toggleSenseExamples(index) {
               <template v-if="item.count">{{ item.count }} 次</template><template v-if="item.count && item.percentage"> · </template>{{ item.percentage }}
             </span>
           </div>
-          <p class="sense-meaning">{{ item.meaning || word.meaning }}</p>
+          <p class="sense-meaning">{{ item.meaning || word.meaning }}<span v-if="item.phrase" class="sense-phrase">（{{ item.phrase }}）</span></p>
           <div class="sense-actions">
             <button v-if="item.examples.length" type="button" class="sense-examples-toggle"
               :aria-expanded="expandedSenses.has(itemIndex)" @click="toggleSenseExamples(itemIndex)">

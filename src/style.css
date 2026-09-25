@@ -519,7 +519,7 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
 .listening-word-forms .word-form-chip { gap: 8px; padding: 8px 12px; border-radius: 8px; }
 .listening-word-forms .word-form-chip strong { font-size: 23px; }
 .listening-word-forms .word-form-chip span { font-size: 18px; }
-.word-stage .word-meta,
+.study-meta,
 .dictation-meta {
   position: static;
   order: 1;
@@ -528,11 +528,15 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
   justify-content: center;
   flex-wrap: wrap;
 }
+.study-meta { margin-top: 14px; }
 .word-details { color: #304f66; }
 .listening-summary-section { display: grid; text-align: center; }
 .listening-meaning-list { display: grid; gap: 8px; }
 .listening-meaning-list .meaning { margin: 0; color: #304f66; text-align: center; }
 .sense-card .sense-meaning { margin-top: 8px; color: #29485e; }
+.word-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.word-summary span { color: #1f648d; font-size: .85em; }
+.sense-phrase { color: #42657c; }
 .part-of-speech { color: #1f648d; }
 .frequency-note { color: #657f91; }
 .sense-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 14px; margin-top: 8px; }
@@ -735,7 +739,7 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
   .listening-word-forms .word-form-chip strong { font-size: 20px; }
   .listening-word-forms .word-form-chip span { font-size: 16px; }
   .listening-word-origin-note { font-size: 16px; }
-  .word-stage .word-meta,
+  .study-meta,
   .dictation-meta {
     position: static;
     order: 1;
@@ -749,6 +753,7 @@ button, input, select, textarea { font: inherit; -webkit-tap-highlight-color: tr
     color: #526f82;
     font-size: 13px;
   }
+  .study-meta { margin: 8px 0 0; }
   .word-meta .audio-toggle,
   .word-meta .favorite-toggle {
     min-height: 44px;
